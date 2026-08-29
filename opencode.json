@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "pdf-tools": {
+      "type": "local",
+      "command": ["uvx", "mcp-pdf"]
+    },
+    "powerpoint": {
+      "type": "local",
+      "command": ["uvx", "--with", "mcp<2", "powerpoint-mcp"]
+    }
+  }
+}

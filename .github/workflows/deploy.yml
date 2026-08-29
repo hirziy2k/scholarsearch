@@ -1,0 +1,29 @@
+name: Deploy to Cloud
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: [test]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build Docker image
+        run: docker build -t pdf2pptx:${{ github.sha }} .
+      
+      - name: Run container health check
+        run: |
+          docker run -d --name test-api -p 8000:8000 pdf2pptx:${{ github.sha }}
+          sleep 10
+          curl -f http://localhost:8000/v1/health || exit 1
+          docker stop test-api
+      
+      - name: Tag for registry
+        run: |
+          docker tag pdf2pptx:${{ github.sha }} pdf2pptx:latest
+          docker tag pdf2pptx:${{ github.sha }} pdf2pptx:${{ github.ref_name }}

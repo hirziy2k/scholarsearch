@@ -1,0 +1,39 @@
+{
+  "name": "PDF to PPTX Converter",
+  "description": "Convert PDF documents to PowerPoint presentations with AI-powered layout preservation",
+  "modules": [
+    {
+      "name": "Convert PDF",
+      "endpoint": "POST /v1/convert",
+      "parameters": [
+        {"name": "file", "type": "file", "required": true, "label": "PDF File"},
+        {"name": "webhook_url", "type": "string", "required": false, "label": "Webhook URL"},
+        {"name": "mcp_augment", "type": "boolean", "required": false, "default": true, "label": "AI Augmentation"}
+      ],
+      "output": {"job_id": "string", "status": "string", "created_at": "string"}
+    },
+    {
+      "name": "Check Job Status",
+      "endpoint": "GET /v1/jobs/{job_id}",
+      "parameters": [{"name": "job_id", "type": "string", "required": true}],
+      "output": {"status": "enum[queued,processing,completed,failed,cancelled]", "progress": "number"}
+    },
+    {
+      "name": "Download Result",
+      "endpoint": "GET /v1/jobs/{job_id}/download",
+      "parameters": [{"name": "job_id", "type": "string", "required": true}],
+      "output": {"file": "binary"}
+    },
+    {
+      "name": "Poll Until Complete",
+      "type": "aggregator",
+      "description": "Polls Check Job Status every 2 seconds until status=completed or status=failed",
+      "max_iterations": 150
+    }
+  ],
+  "connection": {
+    "type": "api_key",
+    "header": "Authorization",
+    "prefix": "Bearer "
+  }
+}

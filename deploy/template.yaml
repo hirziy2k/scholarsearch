@@ -1,0 +1,212 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  PDF-to-PPTX Serverless Event-Driven Architecture
+  SQS queue, DynamoDB status table, S3 storage, Lambda worker
+
+# ---------------------------------------------------------------------------
+# Parameters
+# ---------------------------------------------------------------------------
+Parameters:
+  StageName:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+
+  BucketNameSuffix:
+    Type: String
+    Default: ""
+    Description: Optional suffix appended to the auto-generated S3 bucket name
+
+# ---------------------------------------------------------------------------
+# Globals
+# ---------------------------------------------------------------------------
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 300
+    MemorySize: 1024
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        PDF2PPTX_BUCKET: !Ref StorageBucket
+        PDF2PPTX_TABLE: !Ref JobStatusTable
+        PDF2PPTX_QUEUE: !Ref ConversionQueue
+        AWS_REGION: !Ref AWS::Region
+    Tags:
+      Project: pdf2pptx
+      Stage: !Ref StageName
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+Resources:
+
+  # ---- API Gateway (required for StatusFunction events) --------------------
+  ServerlessRestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Tags:
+        - Key: Project
+          Value: pdf2pptx
+
+  # ---- SQS: Conversion Queue ---------------------------------------------
+  ConversionQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "pdf2pptx-conversion-queue-${StageName}"
+      VisibilityTimeout: 600
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Project
+          Value: pdf2pptx
+
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "pdf2pptx-dlq-${StageName}"
+      MessageRetentionPeriod: 1209600  # 14 days
+      Tags:
+        - Key: Project
+          Value: pdf2pptx
+
+  # ---- DynamoDB: Job Status Table -----------------------------------------
+  JobStatusTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "pdf2pptx-jobs-${StageName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: job_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: job_id
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Project
+          Value: pdf2pptx
+
+  # ---- S3: Storage Bucket -------------------------------------------------
+  StorageBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: !Sub "pdf2pptx-storage-${StageName}${BucketNameSuffix}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireUploads
+            Prefix: uploads/
+            Status: Enabled
+            ExpirationInDays: 1
+          - Id: ExpireOutputs
+            Prefix: outputs/
+            Status: Enabled
+            ExpirationInDays: 7
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: pdf2pptx
+
+  # ---- Lambda: Conversion Worker ------------------------------------------
+  ConversionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "pdf2pptx-worker-${StageName}"
+      Handler: serverless_handler.handler
+      CodeUri: ../
+      Description: >
+        SQS-triggered worker that downloads a PDF from S3, runs orchestrator_v2,
+        uploads the PPTX, writes status, and optionally calls a webhook.
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ConversionQueue.Arn
+            BatchSize: 1
+            MaximumBatchingWindowInSeconds: 5
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !GetAtt ConversionQueue.QueueName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref JobStatusTable
+        - S3CrudPolicy:
+            BucketName: !Ref StorageBucket
+        - KMSDecryptPolicy:
+            KeyId: alias/aws/sqs
+
+  # ---- Lambda: Status Poller (REST API) -----------------------------------
+  StatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "pdf2pptx-status-${StageName}"
+      Handler: serverless_handler.status_handler
+      CodeUri: ../
+      Timeout: 10
+      MemorySize: 128
+      Description: Reads job status from DynamoDB (GET /status/{job_id}).
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref JobStatusTable
+      Events:
+        StatusRequest:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ServerlessRestApi
+            Path: /status/{job_id}
+            Method: get
+
+# ---------------------------------------------------------------------------
+# Outputs
+# ---------------------------------------------------------------------------
+Outputs:
+  ConversionQueueURL:
+    Description: SQS queue URL for conversion jobs
+    Value: !Ref ConversionQueue
+    Export:
+      Name: !Sub "${AWS::StackName}-queue-url"
+
+  ConversionQueueArn:
+    Description: SQS queue ARN
+    Value: !GetAtt ConversionQueue.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-queue-arn"
+
+  DeadLetterQueueURL:
+    Description: DLQ URL
+    Value: !Ref DeadLetterQueue
+
+  JobStatusTableName:
+    Description: DynamoDB table name for job tracking
+    Value: !Ref JobStatusTable
+    Export:
+      Name: !Sub "${AWS::StackName}-table-name"
+
+  StorageBucketName:
+    Description: S3 bucket for uploads, outputs, and status
+    Value: !Ref StorageBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-bucket-name"
+
+  ConversionFunctionArn:
+    Description: Lambda worker ARN
+    Value: !GetAtt ConversionFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-function-arn"
+
+  StatusApiEndpoint:
+    Description: REST API endpoint for status polling
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/status/{job_id}"

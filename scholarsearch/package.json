@@ -1,0 +1,28 @@
+{
+  "name": "scholarsearch",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Academic literature search engine with transparent ranking and regional clinical elevation",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "db:generate": "cd packages/backend && npx prisma generate",
+    "db:push": "cd packages/backend && npx prisma db push",
+    "db:migrate": "cd packages/backend && npx prisma migrate dev",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^20.14.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "npm@10.0.0"
+}

@@ -1,0 +1,108 @@
+name: Dependency Check
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pip-audit
+
+      - name: Run pip-audit
+        run: pip-audit -r requirements.txt --output pip-audit-results.json --format json --desc || true
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-results
+          path: pip-audit-results.json
+
+  outdated:
+    name: Outdated Packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check for outdated packages
+        run: pip list --outdated --format=json > outdated.json || echo "[]" > outdated.json
+
+      - name: Upload outdated results
+        uses: actions/upload-artifact@v4
+        with:
+          name: outdated-packages
+          path: outdated.json
+
+  import-check:
+    name: Import Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify core imports
+        run: |
+          python -c "import fitz; print(f'PyMuPDF {fitz.version}')"
+          python -c "import pptx; print(f'python-pptx {pptx.__version__}')"
+          python -c "import fastapi; print(f'FastAPI {fastapi.__version__}')"
+          python -c "import uvicorn; print(f'Uvicorn {uvicorn.__version__}')"
+          python -c "import httpx; print(f'httpx {httpx.__version__}')"
+          python -c "import redis; print(f'redis-py {redis.__version__}')"
+          python -c "import psutil; print(f'psutil {psutil.__version__}')"
+          python -c "import boto3; print(f'boto3 {boto3.__version__}')"
+
+  phase1-smoke:
+    name: Phase 1 Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run smoke test
+        run: python -m pytest tests/test_smoke.py -v --tb=short 2>&1 || echo "::warning::Phase 1 smoke tests not found or failed"

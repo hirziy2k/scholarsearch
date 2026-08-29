@@ -1,0 +1,41 @@
+{
+  "api_name": "PDF to PPTX",
+  "api_base_url": "https://your-api-domain.com",
+  "authentication": {
+    "type": "header",
+    "header_name": "Authorization",
+    "header_value_format": "Bearer {api_key}"
+  },
+  "endpoints": [
+    {
+      "name": "Convert PDF",
+      "method": "POST",
+      "url": "/v1/convert",
+      "body_type": "form-data",
+      "parameters": [
+        {"name": "file", "type": "file", "required": true},
+        {"name": "webhook_url", "type": "text", "required": false},
+        {"name": "mcp_augment", "type": "boolean", "required": false, "default": "true"}
+      ],
+      "response_type": "json",
+      "response_mapping": {
+        "job_id": "job_id",
+        "status": "status"
+      }
+    },
+    {
+      "name": "Get Job Status",
+      "method": "GET",
+      "url": "/v1/jobs/:job_id",
+      "url_parameters": [{"name": "job_id", "required": true}],
+      "response_type": "json"
+    },
+    {
+      "name": "Download PPTX",
+      "method": "GET",
+      "url": "/v1/jobs/:job_id/download",
+      "url_parameters": [{"name": "job_id", "required": true}],
+      "response_type": "file"
+    }
+  ]
+}

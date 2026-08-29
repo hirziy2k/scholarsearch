@@ -1,0 +1,589 @@
+openapi: 3.0.3
+info:
+  title: PDF-to-PPTX Conversion API
+  version: "2.0.0"
+  description: |
+    REST API for converting PDF documents to PowerPoint (PPTX) presentations
+    with AI-powered layout preservation and structure detection.
+
+    ## Authentication
+    All endpoints require an API key passed via the `Authorization` header.
+
+    ## Rate Limits
+    - 100 requests per minute per API key
+    - Max file upload size: 50 MB
+
+    ## Workflow
+    1. Upload a PDF via `POST /v1/convert`
+    2. Poll status via `GET /v1/jobs/{job_id}`
+    3. Download the result via `GET /v1/jobs/{job_id}/download`
+    4. Optionally cancel via `DELETE /v1/jobs/{job_id}`
+  contact:
+    name: API Support
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.your-domain.com
+    description: Production
+  - url: https://api-staging.your-domain.com
+    description: Staging
+
+tags:
+  - name: Jobs
+    description: Conversion job lifecycle
+  - name: Health
+    description: Service health and metrics
+  - name: Dead Letter Queue
+    description: Failed job management
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API key passed as a Bearer token
+
+  schemas:
+    # ── Convert ──────────────────────────────────────────────
+    ConvertRequest:
+      description: Multipart form-data upload
+      type: object
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          format: binary
+          description: The PDF file to convert (max 50 MB)
+        webhook_url:
+          type: string
+          format: uri
+          description: URL called via POST when the job completes or fails
+        mcp_augment:
+          type: boolean
+          default: true
+          description: Enable AI-powered layout augmentation
+
+    ConvertResponse:
+      type: object
+      required:
+        - job_id
+        - status
+        - created_at
+        - expires_at
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        status:
+          type: string
+          enum:
+            - queued
+          description: Initial status is always "queued"
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          description: When the result files will be automatically deleted
+
+    # ── Job Status ───────────────────────────────────────────
+    JobStatus:
+      type: object
+      required:
+        - job_id
+        - status
+        - progress
+        - created_at
+        - updated_at
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - completed
+            - failed
+            - cancelled
+        progress:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Completion percentage (0-100)
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        result:
+          $ref: "#/components/schemas/JobResult"
+        error:
+          $ref: "#/components/schemas/JobError"
+
+    JobResult:
+      type: object
+      properties:
+        file_name:
+          type: string
+          example: "presentation.pptx"
+        file_size:
+          type: integer
+          format: int64
+          description: File size in bytes
+        page_count:
+          type: integer
+          description: Number of slides generated
+        download_url:
+          type: string
+          format: uri
+          description: Pre-signed download URL (valid for 1 hour)
+        expires_at:
+          type: string
+          format: date-time
+
+    JobError:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "UNSUPPORTED_FORMAT"
+        message:
+          type: string
+          example: "PDF contains encrypted pages that cannot be processed"
+        details:
+          type: object
+          additionalProperties: true
+
+    # ── Health ───────────────────────────────────────────────
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - version
+        - active_jobs
+        - queue_size
+        - dlq_size
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+        version:
+          type: string
+          example: "2.0.0"
+        uptime_seconds:
+          type: integer
+          format: int64
+        active_jobs:
+          type: integer
+          description: Jobs currently being processed
+        queue_size:
+          type: integer
+          description: Jobs waiting in the conversion queue
+        dlq_size:
+          type: integer
+          description: Jobs in the dead-letter queue
+        dependencies:
+          type: object
+          properties:
+            storage:
+              type: string
+              enum:
+                - ok
+                - degraded
+                - down
+            worker:
+              type: string
+              enum:
+                - ok
+                - degraded
+                - down
+
+    # ── Dead Letter Queue ────────────────────────────────────
+    DLQEntry:
+      type: object
+      required:
+        - job_id
+        - original_status
+        - error
+        - failed_at
+        - retry_count
+        - max_retries
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        original_status:
+          type: string
+          enum:
+            - failed
+        error:
+          $ref: "#/components/schemas/JobError"
+        failed_at:
+          type: string
+          format: date-time
+        retry_count:
+          type: integer
+          minimum: 0
+        max_retries:
+          type: integer
+          minimum: 1
+        can_retry:
+          type: boolean
+          description: Whether retries are still available
+
+    DLQListResponse:
+      type: object
+      required:
+        - entries
+        - total
+        - page
+        - page_size
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/DLQEntry"
+        total:
+          type: integer
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+
+    RetryResponse:
+      type: object
+      required:
+        - job_id
+        - status
+        - message
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - queued
+        message:
+          type: string
+          example: "Job requeued for processing"
+
+    # ── Error ────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+
+  parameters:
+    JobIdPath:
+      name: job_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Unique job identifier
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "INVALID_REQUEST"
+              message: "The request body is malformed"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "NOT_FOUND"
+              message: "Job not found"
+
+    UnprocessableEntity:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "VALIDATION_ERROR"
+              message: "Invalid field value"
+              details:
+                field: "mcp_augment"
+                reason: "Expected boolean"
+
+    PayloadTooLarge:
+      description: File exceeds 50 MB limit
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "PAYLOAD_TOO_LARGE"
+              message: "File size exceeds the 50 MB limit"
+
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "INTERNAL_ERROR"
+              message: "An unexpected error occurred"
+
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "UNAUTHORIZED"
+              message: "Invalid or missing API key"
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ── POST /v1/convert ──────────────────────────────────────
+  /v1/convert:
+    post:
+      operationId: convertPdf
+      summary: Upload a PDF for conversion
+      description: |
+        Uploads a PDF file and queues it for conversion to PPTX.
+        Returns a `job_id` that can be used to track progress and download the result.
+        Optionally provide a `webhook_url` to receive a callback when the job completes.
+      tags:
+        - Jobs
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ConvertRequest"
+      responses:
+        "202":
+          description: Job accepted and queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConvertResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── GET /v1/jobs/{job_id} ─────────────────────────────────
+  /v1/jobs/{job_id}:
+    get:
+      operationId: getJobStatus
+      summary: Get job status and progress
+      tags:
+        - Jobs
+      parameters:
+        - $ref: "#/components/parameters/JobIdPath"
+      responses:
+        "200":
+          description: Current job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── GET /v1/jobs/{job_id}/download ────────────────────────
+  /v1/jobs/{job_id}/download:
+    get:
+      operationId: downloadResult
+      summary: Download the converted PPTX file
+      tags:
+        - Jobs
+      parameters:
+        - $ref: "#/components/parameters/JobIdPath"
+      responses:
+        "200":
+          description: PPTX file stream
+          content:
+            application/vnd.openxmlformats-officedocument.presentationml.presentation:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="presentation.pptx"'
+            X-File-Size:
+              schema:
+                type: integer
+                format: int64
+                description: File size in bytes
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── DELETE /v1/jobs/{job_id} ──────────────────────────────
+  /v1/jobs/{job_id}:
+    delete:
+      operationId: cancelJob
+      summary: Cancel a running job
+      description: |
+        Cancels a queued or in-progress conversion job.
+        If the job has already completed, this is a no-op.
+        Returns 204 with no body on success.
+      tags:
+        - Jobs
+      parameters:
+        - $ref: "#/components/parameters/JobIdPath"
+      responses:
+        "204":
+          description: Job cancelled successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── GET /v1/health ────────────────────────────────────────
+  /v1/health:
+    get:
+      operationId: healthCheck
+      summary: Service health check
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Service health status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  # ── GET /v1/dlq ───────────────────────────────────────────
+  /v1/dlq:
+    get:
+      operationId: listDLQ
+      summary: List dead-letter queue entries
+      tags:
+        - Dead Letter Queue
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated DLQ entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DLQListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── POST /v1/dlq/{job_id}/retry ──────────────────────────
+  /v1/dlq/{job_id}/retry:
+    post:
+      operationId: retryDLQJob
+      summary: Retry a failed job from the DLQ
+      tags:
+        - Dead Letter Queue
+      parameters:
+        - $ref: "#/components/parameters/JobIdPath"
+      responses:
+        "202":
+          description: Job requeued for processing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Job cannot be retried (max retries exceeded or not in DLQ)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "RETRY_EXHAUSTED"
+                  message: "Job has exceeded maximum retry attempts"
+        "500":
+          $ref: "#/components/responses/InternalError"

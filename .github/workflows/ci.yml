@@ -1,0 +1,81 @@
+name: PDF-to-PPTX CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            fonts-liberation fonts-dejavu-core fontconfig \
+            build-essential libmupdf-dev
+          sudo fc-cache -fv
+      
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Generate test curriculum
+        run: python generate_curriculum.py
+      
+      - name: Run 51-document curriculum
+        run: python run_curriculum.py
+        timeout-minutes: 10
+      
+      - name: Run structural audit
+        run: python structural_audit.py
+      
+      - name: Parse structural audit score
+        id: audit
+        run: |
+          python -c "
+          import json, sys
+          with open('test_results/results.json') as f:
+              data = json.load(f)
+          total = len(data.get('results', []))
+          passed = sum(1 for r in data.get('results', []) if r.get('success'))
+          score = passed / total * 100 if total > 0 else 0
+          print(f'Score: {score:.1f}%')
+          if score < 99.7:
+              print(f'FAIL: Score {score:.1f}% is below 99.7% threshold')
+              sys.exit(1)
+          print('PASS: Score meets 99.7% threshold')
+          "
+      
+      - name: Run organic hostile tests
+        run: python run_organic_tests.py
+        timeout-minutes: 5
+      
+      - name: Run concurrency stress test
+        run: python stress_test.py
+        timeout-minutes: 5
+      
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: test_results/*.html
+          retention-days: 30

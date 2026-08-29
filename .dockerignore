@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+.git
+.gitignore
+test_results/
+curriculum/
+hostile/
+*.pptx
+*.html
+*.json
+!requirements.txt

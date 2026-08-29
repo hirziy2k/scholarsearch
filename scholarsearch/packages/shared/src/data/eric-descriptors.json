@@ -1,0 +1,245 @@
+{
+  "source": "eric",
+  "entries": [
+    {
+      "term": "vision",
+      "sourceId": "E5200",
+      "synonyms": ["visual acuity", "eyesight", "sight"],
+      "broaderTerms": ["sensory experience"],
+      "narrowerTerms": ["visual acuity", "visual impairment", "color vision"],
+      "note": "The faculty of sight. Includes all aspects of visual perception.",
+      "weight": 1.0
+    },
+    {
+      "term": "visual acuity",
+      "sourceId": "E5200",
+      "synonyms": ["clarity of vision", "sharpness of vision"],
+      "broaderTerms": ["vision"],
+      "narrowerTerms": [],
+      "weight": 0.95
+    },
+    {
+      "term": "visual impairment",
+      "sourceId": "E5201",
+      "synonyms": ["low vision", "vision loss", "blindness", "visual disability"],
+      "broaderTerms": ["vision", "disabilities"],
+      "narrowerTerms": ["low vision", "blindness"],
+      "note": "Impairment of one or more functions of the eye.",
+      "weight": 0.95
+    },
+    {
+      "term": "optometry",
+      "sourceId": "E4600",
+      "synonyms": ["optometric practice", "eye care", "vision care"],
+      "broaderTerms": ["health professions education"],
+      "narrowerTerms": ["refraction", "contact lenses", "ocular disease"],
+      "note": "The health care profession concerned with examining the eye for defects and faults of refraction, with prescribing corrective lenses, and with diagnosing and treating eye diseases.",
+      "weight": 1.0
+    },
+    {
+      "term": "optometric technician",
+      "sourceId": "E4601",
+      "synonyms": ["refractionist", "optometry assistant", "vision care technician", "optometric auxiliary"],
+      "broaderTerms": ["optometry", "allied health personnel"],
+      "narrowerTerms": [],
+      "note": "Personnel trained to assist optometrists in clinical practice.",
+      "weight": 0.95
+    },
+    {
+      "term": "refraction",
+      "sourceId": "E4602",
+      "synonyms": ["refractive error", "refractive testing", "clinical refraction"],
+      "broaderTerms": ["optometry"],
+      "narrowerTerms": ["cycloplegic refraction", "retinoscopy"],
+      "note": "The determination of the refractive error of the eye.",
+      "weight": 0.95
+    },
+    {
+      "term": "glaucoma",
+      "sourceId": "E4200",
+      "synonyms": ["increased intraocular pressure", "optic neuropathy"],
+      "broaderTerms": ["ocular diseases"],
+      "narrowerTerms": ["open angle glaucoma", "angle closure glaucoma", "normal tension glaucoma"],
+      "note": "A group of diseases affecting the optic nerve.",
+      "weight": 1.0
+    },
+    {
+      "term": "cataract",
+      "sourceId": "E4201",
+      "synonyms": ["lens opacity", "cloudy lens"],
+      "broaderTerms": ["ocular diseases"],
+      "narrowerTerms": ["senile cataract", "traumatic cataract"],
+      "note": "Opacity of the crystalline lens.",
+      "weight": 1.0
+    },
+    {
+      "term": "dry eye",
+      "sourceId": "E4202",
+      "synonyms": ["dry eye syndrome", "keratoconjunctivitis sicca", "ocular surface disease", "dysfunctional tear syndrome"],
+      "broaderTerms": ["ocular diseases", "ocular surface"],
+      "narrowerTerms": ["aqueous deficient dry eye", "evaporative dry eye"],
+      "note": "A multifactorial disease of the ocular surface characterized by loss of homeostasis of the tear film.",
+      "weight": 1.0
+    },
+    {
+      "term": "myopia",
+      "sourceId": "E4203",
+      "synonyms": ["nearsightedness", "short-sightedness"],
+      "broaderTerms": ["refractive errors"],
+      "narrowerTerms": ["high myopia", "pathological myopia"],
+      "note": "A refractive error where distant objects appear blurred.",
+      "weight": 1.0
+    },
+    {
+      "term": "visual training",
+      "sourceId": "E5210",
+      "synonyms": ["vision therapy", "orthoptics", "vision training", "behavioral optometry"],
+      "broaderTerms": ["optometry", "therapeutic interventions"],
+      "narrowerTerms": ["binocular vision training", "accommodative training"],
+      "note": "Programs designed to improve visual skills and efficiency.",
+      "weight": 0.95
+    },
+    {
+      "term": "ocular diseases",
+      "sourceId": "E4200",
+      "synonyms": ["eye diseases", "eye disorders", "ophthalmic diseases"],
+      "broaderTerms": ["health conditions"],
+      "narrowerTerms": ["glaucoma", "cataract", "dry eye", "retinal diseases", "corneal diseases"],
+      "note": "Diseases affecting the eye and its structures.",
+      "weight": 1.0
+    },
+    {
+      "term": "driving",
+      "sourceId": "E3800",
+      "synonyms": ["automobile driving", "motor vehicle driving", "driving performance", "driving ability"],
+      "broaderTerms": ["recreational activities", "daily living skills"],
+      "narrowerTerms": ["night driving", "elderly driving"],
+      "note": "Operating a motor vehicle.",
+      "weight": 1.0
+    },
+    {
+      "term": "night driving",
+      "sourceId": "E3801",
+      "synonyms": ["nocturnal driving", "driving at night", "low-light driving"],
+      "broaderTerms": ["driving"],
+      "narrowerTerms": [],
+      "note": "Operating a motor vehicle during nighttime hours.",
+      "weight": 0.95
+    },
+    {
+      "term": "adult education",
+      "sourceId": "E1100",
+      "synonyms": ["adult learning", "continuing education", "lifelong learning"],
+      "broaderTerms": ["education"],
+      "narrowerTerms": ["adult basic education", "workplace training"],
+      "note": "Programs and instruction for adults.",
+      "weight": 1.0
+    },
+    {
+      "term": "health education",
+      "sourceId": "E2600",
+      "synonyms": ["health promotion", "health literacy", "health teaching"],
+      "broaderTerms": ["education"],
+      "narrowerTerms": ["eye health education", "preventive health care"],
+      "note": "Education aimed at improving community health practices.",
+      "weight": 1.0
+    },
+    {
+      "term": "vision education",
+      "sourceId": "E5210",
+      "synonyms": ["eye education", "visual instruction", "ocular health education"],
+      "broaderTerms": ["health education", "optometry"],
+      "narrowerTerms": [],
+      "note": "Education about visual health and eye care.",
+      "weight": 0.95
+    },
+    {
+      "term": "diabetic retinopathy",
+      "sourceId": "E4210",
+      "synonyms": ["diabetic eye disease", "DR", "proliferative diabetic retinopathy"],
+      "broaderTerms": ["ocular diseases", "diabetes complications"],
+      "narrowerTerms": ["proliferative diabetic retinopathy", "nonproliferative diabetic retinopathy"],
+      "note": "Retinopathy caused by diabetes mellitus.",
+      "weight": 1.0
+    },
+    {
+      "term": "contact lenses",
+      "sourceId": "E4603",
+      "synonyms": ["contact lens", "corneal lens", "invisible lens"],
+      "broaderTerms": ["optometry", "ophthalmic aids"],
+      "narrowerTerms": ["soft contact lenses", "rigid gas permeable lenses"],
+      "note": "Lenses worn directly on the cornea.",
+      "weight": 1.0
+    },
+    {
+      "term": "pediatric optometry",
+      "sourceId": "E4610",
+      "synonyms": ["children eye care", "paediatric eye care", "infant vision"],
+      "broaderTerms": ["optometry", "pediatrics"],
+      "narrowerTerms": ["amblyopia", "strabismus"],
+      "note": "Optometric care for children and infants.",
+      "weight": 0.95
+    }
+  ],
+  "overlays": [
+    {
+      "region": "MY",
+      "name": "Malaysia",
+      "mappings": {
+        "optometric technician": ["refractionist", "klinik optometri juruteknik", "optometric assistant"],
+        "community clinic": ["klinik kesihatan", "klinik komuniti"],
+        "government hospital": ["hospital kerajaan", "hospitals ministry of health"],
+        "visual training": ["latihan penglihatan", "terapi penglihatan"],
+        "health education": ["pendidikan kesihatan", "kesihatan awam"],
+        "adult education": ["pendidikan dewasa", "pendidikan orang dewasa"],
+        "driving": ["pemanduan", "memandu kenderaan"],
+        "night driving": ["pemanduan malam", "pemanduan waktu malam"]
+      },
+      "additions": [
+        {
+          "term": "klinik kesihatan",
+          "sourceId": "MY-CK",
+          "synonyms": ["community health clinic", "government clinic"],
+          "broaderTerms": ["community clinic"],
+          "narrowerTerms": [],
+          "note": "Malaysian Ministry of Health primary care facility.",
+          "weight": 0.95
+        }
+      ],
+      "exclusions": []
+    },
+    {
+      "region": "SG",
+      "name": "Singapore",
+      "mappings": {
+        "optometric technician": ["optometric associate", "vision care associate"],
+        "community clinic": ["polyclinic", "community health centre"],
+        "government hospital": ["public hospital", "restructured hospital"],
+        "health education": ["health promotion", "community health education"]
+      },
+      "additions": [
+        {
+          "term": "polyclinic",
+          "sourceId": "SG-PC",
+          "synonyms": ["public polyclinic", "MOH polyclinic"],
+          "broaderTerms": ["community clinic"],
+          "narrowerTerms": [],
+          "note": "Singapore government primary care facility.",
+          "weight": 0.95
+        }
+      ],
+      "exclusions": []
+    },
+    {
+      "region": "AU",
+      "name": "Australia",
+      "mappings": {
+        "optometric technician": ["orthoptist", "vision science associate"],
+        "community clinic": ["bulk billing clinic", "primary health network"],
+        "visual training": ["vision therapy", "behavioural optometry"]
+      },
+      "additions": [],
+      "exclusions": []
+    }
+  ]
+}

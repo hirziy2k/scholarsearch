@@ -1,0 +1,20 @@
+// Schemas
+export * from "./schemas/paper.js";
+export * from "./schemas/search.js";
+
+// Utils
+export * from "./utils/dedup.js";
+export * from "./utils/ranking.js";
+export * from "./utils/circuit-breaker.js";
+export * from "./utils/query-parser.js";
+export * from "./utils/cardinality.js";
+export * from "./utils/vocabulary-crosswalk.js";
+export * from "./utils/document-tiers.js";
+export * from "./utils/oa-resolver.js";
+
+// Re-export specific types from dedup for convenience
+export {
+  extractEntities,
+  hasConflictingEntities,
+  type ExtractedEntities,
+} from "./utils/dedup.js";

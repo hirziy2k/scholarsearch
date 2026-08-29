@@ -1,0 +1,167 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Search Sessions
+// ============================================
+
+model SearchSession {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Query details
+  rawQuery      String
+  expandedQuery Json?    // ExpandedQuery JSON
+  mode          String   // SearchMode enum value
+  filters       Json?    // SearchFilters JSON
+  weights       Json?    // RankingWeights JSON
+
+  // Source results
+  sourcesQueried Json?   // Array of SourceSearchResult JSON
+
+  // Statistics
+  totalRawResults     Int @default(0)
+  afterDeduplication  Int @default(0)
+  durationMs          Int @default(0)
+
+  // Model usage
+  modelUsed     String?
+  modelVersion  String?
+
+  // Relations
+  results       SearchResult[]
+  savedPapers   SavedPaper[]
+}
+
+// ============================================
+// Search Results (Cached)
+// ============================================
+
+model SearchResult {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+
+  // Links
+  sessionId     String
+  session       SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Paper identification
+  dedupHash     String   @unique // SHA-256 hash for deduplication
+  openalexId    String?
+  semanticScholarId String?
+  pubmedId      String?
+  pmcid         String?
+  doi           String?
+  arxivId       String?
+
+  // Core metadata
+  title         String
+  authors       Json     // Array of Author JSON
+  year          Int
+  journalName   String?
+  journalIssn   String?
+  publisher     String?
+  abstract      String?
+  keywords      Json     @default("[]") // Array of strings
+  meshTerms     Json     @default("[]") // Array of strings
+  concepts      Json     @default("[]") // Array of {name, score}
+
+  // Classification
+  publicationType String
+  studyDesign   String?
+  peerReviewStatus Json  // PeerReviewStatus JSON
+  language      String?
+  country       String?
+
+  // Metrics
+  citationCount Json?    // CitationCount JSON
+  journalMetrics Json?   // JournalMetrics JSON
+
+  // Open Access
+  openAccessStatus Json  // OpenAccessStatus JSON
+  fullTextUrl   String?
+
+  // Retraction
+  retractionStatus Json  // RetractionStatus JSON
+
+  // Scoring
+  rankingScores Json     // RankingScores JSON
+  picoAlignment Json?    // PICOAlignment JSON
+
+  // Provenance
+  sourceDatabases Json  // Array of source names
+  provenance     Json   // Provenance JSON
+
+  // Relevance explanation
+  relevanceExplanation String?
+
+  // Indexes
+  @@index([sessionId])
+  @@index([doi])
+  @@index([year])
+  @@index([publicationType])
+}
+
+// ============================================
+// Saved Papers
+// ============================================
+
+model SavedPaper {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // User (placeholder for future auth)
+  userId        String   @default("anonymous")
+
+  // Paper reference
+  sessionId     String?
+  session       SearchSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  // Paper metadata (denormalized for independence)
+  dedupHash     String
+  title         String
+  doi           String?
+  year          Int
+  journalName   String?
+  authors       Json
+  abstract      String?
+
+  // User annotations
+  tags          Json     @default("[]") // Array of strings
+  notes         String?
+  readStatus    String   @default("unread") // unread | reading | read
+  rating        Int?     // 1-5
+
+  @@index([userId])
+  @@index([dedupHash])
+}
+
+// ============================================
+// Audit Log
+// ============================================
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+
+  action        String   // search | export | save | api_call
+  details       Json
+  source        String?  // which API was called
+  durationMs    Int?
+  success       Boolean  @default(true)
+  error         String?
+
+  @@index([createdAt])
+  @@index([action])
+}
