@@ -31,7 +31,7 @@ jobs:
 
       - name: Upload audit results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pip-audit-results
           path: pip-audit-results.json
@@ -56,7 +56,7 @@ jobs:
         run: pip list --outdated --format=json > outdated.json || echo "[]" > outdated.json
 
       - name: Upload outdated results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: outdated-packages
           path: outdated.json
