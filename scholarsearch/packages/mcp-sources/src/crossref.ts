@@ -85,4 +85,47 @@ export class CrossrefClient implements SourceClient {
       return null;
     }
   }
+
+  /**
+   * Batch resolve multiple DOIs via Crossref filter API.
+   * Returns a map of doi → metadata.
+   */
+  async batchResolveDois(dois: string[]): Promise<Record<string, Record<string, any>>> {
+    const result: Record<string, Record<string, any>> = {};
+    if (dois.length === 0) return result;
+
+    try {
+      await this.rateLimiter.acquire();
+
+      // Crossref supports pipe-separated DOI filters
+      const filterDoi = dois.map(d => `doi:${d}`).join("|");
+      const params = new URLSearchParams({
+        filter: filterDoi,
+        rows: String(dois.length),
+        select: "DOI,title,abstract,is-referenced-by-count,link,license,type,author,published-print,published-online,container-title",
+      });
+
+      if (this.email) {
+        params.set("mailto", this.email);
+      }
+
+      const url = `${BASE_URL}/works?${params.toString()}`;
+      const res = await fetchWithRetry(url);
+      if (!res.ok) return result;
+
+      const data = await res.json() as any;
+      const items = data.message?.items ?? [];
+
+      for (const item of items) {
+        const doi = item.DOI?.toLowerCase();
+        if (doi) {
+          result[doi] = item;
+        }
+      }
+    } catch {
+      // Return partial results
+    }
+
+    return result;
+  }
 }

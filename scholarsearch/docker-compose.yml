@@ -34,7 +34,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: packages/backend/Dockerfile
+      dockerfile: apps/server/Dockerfile
     container_name: scholarsearch-backend
     ports:
       - "3001:3001"
@@ -51,7 +51,7 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./packages/backend/src:/app/packages/backend/src
+      - ./apps/server/src:/app/apps/server/src
       - ./packages/shared/src:/app/packages/shared/src
       - ./packages/mcp-sources/src:/app/packages/mcp-sources/src
       - ./packages/omniroute/src:/app/packages/omniroute/src
@@ -59,7 +59,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: packages/frontend/Dockerfile
+      dockerfile: apps/client/Dockerfile
     container_name: scholarsearch-frontend
     ports:
       - "3000:3000"
@@ -68,7 +68,7 @@ services:
     depends_on:
       - backend
     volumes:
-      - ./packages/frontend/src:/app/packages/frontend/src
+      - ./apps/client/src:/app/apps/client/src
 
 volumes:
   postgres_data:

@@ -14,6 +14,7 @@ export const SearchModeSchema = z.enum([
   "adversarial",
   "bibliometric",
   "clinical",
+  "openness",
 ]);
 
 export type SearchMode = z.infer<typeof SearchModeSchema>;

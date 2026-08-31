@@ -11,6 +11,9 @@ export * from "./utils/cardinality.js";
 export * from "./utils/vocabulary-crosswalk.js";
 export * from "./utils/document-tiers.js";
 export * from "./utils/oa-resolver.js";
+export * from "./utils/query-versioning.js";
+export * from "./utils/predatory-quarantine.js";
+export * from "./utils/gap-analysis.js";
 
 // Re-export specific types from dedup for convenience
 export {

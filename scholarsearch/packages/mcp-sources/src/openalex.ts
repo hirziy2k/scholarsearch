@@ -89,4 +89,47 @@ export class OpenAlexClient implements SourceClient {
       };
     }
   }
+
+  /**
+   * Batch resolve multiple DOIs via OpenAlex filter API.
+   * Returns a map of doi → metadata.
+   */
+  async batchResolveDois(dois: string[]): Promise<Record<string, Record<string, any>>> {
+    const result: Record<string, Record<string, any>> = {};
+    if (dois.length === 0) return result;
+
+    try {
+      await this.rateLimiter.acquire();
+
+      // OpenAlex supports pipe-separated DOI filters (full URL format)
+      const filterDoi = dois.map(d => `doi:https://doi.org/${d}`).join("|");
+      const params = new URLSearchParams({
+        filter: filterDoi,
+        per_page: String(dois.length),
+        select: "id,doi,title,open_access,type,publication_year,cited_by_count,abstract_inverted_index",
+      });
+
+      if (this.email) {
+        params.set("mailto", this.email);
+      }
+
+      const url = `${BASE_URL}/works?${params.toString()}`;
+      const res = await fetchWithRetry(url);
+      if (!res.ok) return result;
+
+      const data = await res.json() as any;
+      const items = data.results ?? [];
+
+      for (const item of items) {
+        const doi = item.doi?.replace(/^https:\/\/doi\.org\//, "")?.toLowerCase();
+        if (doi) {
+          result[doi] = item;
+        }
+      }
+    } catch {
+      // Return partial results
+    }
+
+    return result;
+  }
 }

@@ -1,4 +1,24 @@
 import type { RankingWeights, SearchMode } from "../schemas/search.js";
+import { getPredatoryMultiplier } from "./predatory-quarantine.js";
+
+// ============================================
+// Openness-First Ranking Weights
+// ============================================
+// Alternative ranking mode that heavily weights OA availability,
+// code availability, dataset availability, and open licenses.
+// Flips the bias away from closed-access legacy journals.
+
+export const OPENNESS_WEIGHTS: RankingWeights = {
+  relevance: 0.15,
+  semantic_similarity: 0.10,
+  keyword_match: 0.10,
+  peer_review: 0.05,
+  study_design: 0.05,
+  citation_impact: 0.05,
+  journal_quality: 0.05,
+  recency: 0.10,
+  oa_availability: 0.35,  // Heavy weight on openness
+};
 
 // ============================================
 // Default Ranking Weights by Mode
@@ -104,7 +124,80 @@ export const DEFAULT_WEIGHTS: Record<SearchMode, RankingWeights> = {
     recency: 0.15,
     oa_availability: 0.00,
   },
+  openness: OPENNESS_WEIGHTS,
 };
+
+// ============================================
+// Openness Score Calculator
+// ============================================
+
+export interface OpennessSignals {
+  isOa?: boolean;
+  hasCode?: boolean;
+  hasDataset?: boolean;
+  hasOpenLicense?: boolean;
+  hasFullText?: boolean;
+}
+
+/**
+ * Calculate an openness score (0-1) for a paper.
+ * Higher scores = more open and accessible.
+ * Returns NEGATIVE scores for predatory sources (quarantined).
+ */
+export function calculateOpennessScore(signals: OpennessSignals, paper?: any): number {
+  let score = 0;
+  if (signals.isOa) score += 0.35;
+  if (signals.hasCode) score += 0.25;
+  if (signals.hasDataset) score += 0.20;
+  if (signals.hasOpenLicense) score += 0.10;
+  if (signals.hasFullText) score += 0.10;
+
+  // Predatory OA Quarantine: flip score to negative if source is flagged
+  if (paper) {
+    const multiplier = getPredatoryMultiplier(paper);
+    if (multiplier < 0) {
+      // Predatory source: invert and amplify the penalty
+      return Math.max(-2.0, score * multiplier);
+    }
+  }
+
+  return Math.min(1, score);
+}
+
+/**
+ * Detect openness signals from a paper record.
+ */
+export function detectOpennessSignals(paper: any): OpennessSignals {
+  const isOa = paper.isOa ?? paper.is_oa ?? false;
+  const hasFullText = !!paper.fullTextUrl || !!paper.openAccessPdf;
+
+  // Check for code availability (common indicators)
+  const hasCode = !!(
+    paper.codeUrl ||
+    paper.code_repository ||
+    paper.github_url ||
+    (paper.title && /code\s+(available|at|on|in)/i.test(paper.title)) ||
+    (paper.abstract && /code\s+(available|at|on|in)\s+(github|gitlab|bitbucket)/i.test(paper.abstract))
+  );
+
+  // Check for dataset availability
+  const hasDataset = !!(
+    paper.datasetUrl ||
+    paper.data_repository ||
+    paper.figshare_url ||
+    paper.dryad_url ||
+    (paper.title && /data\s+(available|at|on|in|set)/i.test(paper.title)) ||
+    (paper.abstract && /data\s+(available|at|on|in)\s+(figshare|dryad|zenodo)/i.test(paper.abstract))
+  );
+
+  // Check for open license
+  const hasOpenLicense = !!(
+    paper.license &&
+    /cc[-\s]?(by|by-sa|by-nc|by-nd|zero|0|pddl)/i.test(paper.license)
+  );
+
+  return { isOa, hasCode, hasDataset, hasOpenLicense, hasFullText };
+}
 
 // ============================================
 // Study Design Hierarchy (Evidence Level)

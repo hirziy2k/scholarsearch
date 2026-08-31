@@ -4,16 +4,20 @@
   "private": true,
   "description": "Academic literature search engine with transparent ranking and regional clinical elevation",
   "workspaces": [
+    "apps/*",
     "packages/*"
   ],
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "start": "node start.js",
+    "start:backend": "cd apps/server && npm run start",
+    "start:frontend": "cd apps/client && npm run start",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "db:generate": "cd packages/backend && npx prisma generate",
-    "db:push": "cd packages/backend && npx prisma db push",
-    "db:migrate": "cd packages/backend && npx prisma migrate dev",
+    "db:generate": "cd apps/server && npx prisma generate",
+    "db:push": "cd apps/server && npx prisma db push",
+    "db:migrate": "cd apps/server && npx prisma migrate dev",
     "clean": "turbo run clean"
   },
   "devDependencies": {

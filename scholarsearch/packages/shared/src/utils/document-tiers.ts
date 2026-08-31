@@ -12,6 +12,17 @@
 // are NOT algorithmically buried beneath less relevant RCTs.
 
 // ============================================
+// Helpers
+// ============================================
+
+function safeLower(val: unknown): string {
+  if (val == null) return "";
+  if (typeof val === "string") return val.toLowerCase();
+  if (Array.isArray(val)) return val.map(safeLower).join(" ");
+  return String(val).toLowerCase();
+}
+
+// ============================================
 // Peer-Review Tiers (L1-L6)
 // ============================================
 
@@ -267,8 +278,8 @@ export function classifyDocument(
   }
 
   // === Priority 3: Structural regex + institutional publishers ===
-  const title = (paper.title ?? "").toLowerCase();
-  const abstract = (paper.abstract ?? "").toLowerCase();
+  const title = safeLower(paper.title);
+  const abstract = safeLower(paper.abstract);
   const fullText = `${title} ${abstract}`;
 
   // Check title/abstract triggers
@@ -285,10 +296,8 @@ export function classifyDocument(
   }
 
   // Check institutional publisher
-  const publisher = (paper.publisher ?? "").toLowerCase();
-  const containerTitle = Array.isArray(paper.containerTitle)
-    ? paper.containerTitle.join(" ").toLowerCase()
-    : (paper.containerTitle ?? "").toLowerCase();
+  const publisher = safeLower(paper.publisher);
+  const containerTitle = safeLower(paper.containerTitle);
 
   for (const inst of INSTITUTIONAL_PUBLISHERS) {
     if (publisher.includes(inst) || containerTitle.includes(inst)) {

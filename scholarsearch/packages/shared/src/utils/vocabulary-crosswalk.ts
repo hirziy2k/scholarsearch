@@ -187,6 +187,7 @@ export function createRegionalOverlay(
 // Lazy-loaded registries
 let _ericRegistry: CrosswalkRegistry | null = null;
 let _doajRegistry: CrosswalkRegistry | null = null;
+let _malayClinicalRegistry: CrosswalkRegistry | null = null;
 
 /**
  * Get the ERIC thesaurus crosswalk.
@@ -217,4 +218,21 @@ export async function getDOAJCrosswalk(region?: string): Promise<CrosswalkRegist
     }
   }
   return _doajRegistry;
+}
+
+/**
+ * Get the Malay Clinical Vocabulary crosswalk.
+ * Intercepts Western terms and injects Malaysian clinical vernacular.
+ */
+export async function getMalayClinicalCrosswalk(region?: string): Promise<CrosswalkRegistry> {
+  if (!_malayClinicalRegistry) {
+    try {
+      const mod = await import("../data/malay-clinical.js");
+      const { malayClinicalData } = mod;
+      _malayClinicalRegistry = createCrosswalk("malay_clinical", malayClinicalData.entries ?? [], malayClinicalData.overlays ?? []);
+    } catch {
+      _malayClinicalRegistry = createCrosswalk("malay_clinical", []);
+    }
+  }
+  return _malayClinicalRegistry;
 }

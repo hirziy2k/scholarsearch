@@ -12,7 +12,8 @@ export type TaskType =
   | "relevance_explanation"
   | "source_quality_explanation"
   | "demographic_extraction"
-  | "query_to_sql";
+  | "query_to_sql"
+  | "summary";
 
 export type TaskComplexity = "simple" | "moderate" | "complex";
 
@@ -87,6 +88,12 @@ const ROUTING_TABLE: Record<TaskType, TaskClassification> = {
     complexity: "moderate",
     recommendedProvider: "anthropic",
     recommendedModel: "claude-sonnet-4-20250514",
+  },
+  summary: {
+    type: "summary",
+    complexity: "simple",
+    recommendedProvider: "anthropic",
+    recommendedModel: "claude-haiku-4-20250414",
   },
 };
 
