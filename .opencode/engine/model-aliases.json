@@ -1,0 +1,75 @@
+{
+  "$schema": "https://opencode.ai/model-aliases.json",
+  "description": "Model alias mapping for OpenCode -> OmniRoute/OpenRouter routing",
+  "aliases": {
+    "nemotron-ultra-free": {
+      "canonical": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "display_name": "Nemotron Ultra 550B Free",
+      "provider": "openrouter",
+      "fallbacks": [
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "google/gemma-4-31b-it:free",
+        "meta-llama/llama-3.3-70b-instruct:free"
+      ],
+      "context_window": 1048576,
+      "max_tokens": 16384
+    },
+    "nemotron3.5-lightning-free": {
+      "canonical": "nvidia/nemotron-3.5-lightning:free",
+      "display_name": "Nemotron 3.5 Lightning Free",
+      "provider": "openrouter",
+      "fallbacks": [
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "google/gemma-4-31b-it:free",
+        "cohere/north-mini-code:free"
+      ],
+      "context_window": 1000000,
+      "max_tokens": 16384
+    },
+    "gemma4-31b-free": {
+      "canonical": "google/gemma-4-31b-it:free",
+      "display_name": "Gemma 4 31B Free",
+      "provider": "openrouter",
+      "fallbacks": [
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "google/gemma-4-26b-a4b-it:free"
+      ],
+      "context_window": 262144,
+      "max_tokens": 8192
+    },
+    "gemma4-26b-free": {
+      "canonical": "google/gemma-4-26b-a4b-it:free",
+      "display_name": "Gemma 4 26B Free (Multimodal)",
+      "provider": "openrouter",
+      "fallbacks": [
+        "google/gemma-4-31b-it:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "meta-llama/llama-3.3-70b-instruct:free"
+      ],
+      "context_window": 262144,
+      "max_tokens": 8192
+    },
+    "nemotron-super-free": {
+      "canonical": "nvidia/nemotron-3-super-120b-a12b:free",
+      "display_name": "Nemotron Super 120B Free",
+      "provider": "openrouter",
+      "fallbacks": [
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "google/gemma-4-31b-it:free",
+        "meta-llama/llama-3.1-8b-instruct:free"
+      ],
+      "context_window": 262144,
+      "max_tokens": 8192
+    }
+  },
+  "routing_rules": {
+    "prefix_rewrite": {
+      "opencode/": "",
+      "oc/": ""
+    },
+    "require_canonical_slug": true,
+    "auto_fallback_on_401": true,
+    "max_fallback_attempts": 3
+  }
+}

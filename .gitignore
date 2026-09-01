@@ -16,21 +16,43 @@ __pycache__/
 .venv/
 venv/
 
-# ===== Generated output artifacts =====
-output_v2/
-output_serverless/
-output_test.pptx
-hostile/
-curriculum/
-extraction_raw.json
-tables_raw.json
-trace_report.html
-trace_waterfall.svg
-branding_sample_report.html
+# ===== OpenCode engine build artifacts =====
+.opencode/node_modules/
+.opencode/__pycache__/
+.opencode/*.py[cod]
+.opencode/slide_state.sqlite
+.opencode/slide_state.sqlite-*
+.opencode/output_*.html
+.opencode/output_*.pptx
+.opencode/_test_*.py
+.opencode/server_*.log
+.opencode/_object_store/
+.opencode/_relay_store/
 
-# ===== Test results =====
-test_results/
-*.log
+# ===== PDF-to-PPTX specific =====
+services/pdf-engine/output_v2/
+services/pdf-engine/output_serverless/
+services/pdf-engine/output_test.pptx
+services/pdf-engine/hostile/
+services/pdf-engine/curriculum/
+services/pdf-engine/extraction_raw.json
+services/pdf-engine/tables_raw.json
+services/pdf-engine/trace_report.html
+services/pdf-engine/trace_waterfall.svg
+services/pdf-engine/branding_sample_report.html
+services/pdf-engine/test_results/
+services/pdf-engine/*.log
+services/pdf-engine/messy_test.pdf
+services/pdf-engine/src/
+services/pdf-engine/build/
+services/pdf-engine/dist/
+services/pdf-engine/*.egg-info/
+
+# ===== ScholarSearch specific =====
+services/scholarsearch/.turbo/
+services/scholarsearch/apps/client/.next/
+services/scholarsearch/apps/server/dist/
+services/scholarsearch/packages/*/dist/
 
 # ===== OS / editor =====
 .DS_Store

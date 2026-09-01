@@ -1,0 +1,27 @@
+node_modules/
+bun.lock
+
+# Runtime databases - NEVER commit (proprietary data at rest)
+slide_state.sqlite
+slide_state.sqlite-*
+*.sqlite
+*.sqlite-*
+
+# Ephemeral object/relay stores
+_object_store/
+_relay_store/
+
+# Output artifacts (BytesIO buffers)
+output_*.html
+output_*.pptx
+_test_*.py
+server_*.log
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Session state (managed by session-state-tracker skill)
+# Do NOT gitignore — state is part of the project
+# session-state.json
