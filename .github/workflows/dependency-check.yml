@@ -4,6 +4,14 @@ on:
   schedule:
     - cron: "0 9 * * 1"
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'services/pdf-engine/requirements*.txt'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'services/pdf-engine/requirements*.txt'
 
 permissions:
   contents: read
@@ -13,6 +21,9 @@ jobs:
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/pdf-engine
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,11 +45,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pip-audit-results
-          path: pip-audit-results.json
+          path: services/pdf-engine/pip-audit-results.json
 
   outdated:
     name: Outdated Packages
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/pdf-engine
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,11 +73,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: outdated-packages
-          path: outdated.json
+          path: services/pdf-engine/outdated.json
 
   import-check:
     name: Import Verification
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/pdf-engine
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -91,6 +108,9 @@ jobs:
   phase1-smoke:
     name: Phase 1 Smoke Test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/pdf-engine
     steps:
       - name: Checkout
         uses: actions/checkout@v4

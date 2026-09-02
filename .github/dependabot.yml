@@ -1,7 +1,8 @@
 version: 2
 updates:
+  # PDF-to-PPTX (Python)
   - package-ecosystem: "pip"
-    directory: "/"
+    directory: "/services/pdf-engine"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -11,8 +12,9 @@ updates:
       - "dependencies"
       - "python"
 
+  # PDF-to-PPTX (Docker)
   - package-ecosystem: "docker"
-    directory: "/"
+    directory: "/services/pdf-engine"
     schedule:
       interval: "monthly"
     commit-message:
@@ -21,6 +23,19 @@ updates:
       - "dependencies"
       - "docker"
 
+  # ScholarSearch (npm)
+  - package-ecosystem: "npm"
+    directory: "/services/scholarsearch"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "dependencies"
+      - "node"
+
+  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

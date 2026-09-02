@@ -1,5 +1,12 @@
 {
-  "dependencies": {
-    "@ai-sdk/openai-compatible": "^3.0.30"
+  "name": "academic-ai-engine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Academic research tools orchestrated by OpenCode AI agent",
+  "scripts": {
+    "dev:scholarsearch": "cd services/scholarsearch && npm run dev",
+    "dev:pdf-engine": "cd services/pdf-engine && python orchestrator_v2.py",
+    "build:scholarsearch": "cd services/scholarsearch && npm run build",
+    "lint": "echo 'No root lint configured'"
   }
 }

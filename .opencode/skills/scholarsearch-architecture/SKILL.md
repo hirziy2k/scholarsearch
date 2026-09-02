@@ -15,12 +15,12 @@ Use when working with the ScholarSearch academic literature search engine — a 
 
 ## Project Location
 
-`C:\Users\hirzi\OneDrive\Documents\Default Project\scholarsearch`
+`C:\Users\hirzi\OneDrive\Documents\Default Project\services\scholarsearch`
 
 ## Monorepo Structure
 
 ```
-scholarsearch/
+services/scholarsearch/
 ├── apps/
 │   ├── client/              # Next.js 14 PWA (port 3000)
 │   │   ├── src/
@@ -273,7 +273,7 @@ Network drops → Serwist SW serves cached app shell
 ## Common Tasks
 
 ### Adding a new source client
-1. Create `packages/mcp-sources/src/newsource.ts`
+1. Create `services/scholarsearch/packages/mcp-sources/src/newsource.ts`
 2. Implement `SourceClient` interface from `shared/src/index.ts`
 3. Add to `search-orchestrator.ts` dispatch list
 4. Add query compiler to `query-parser.ts`
@@ -297,11 +297,11 @@ Network drops → Serwist SW serves cached app shell
 npm run build
 
 # Run individual package builds
-cd packages/shared && npm run build
-cd packages/mcp-sources && npm run build
-cd packages/omniroute && npm run build
-cd apps/server && npm run build
-cd apps/client && npm run build
+cd services/scholarsearch/packages/shared && npm run build
+cd services/scholarsearch/packages/mcp-sources && npm run build
+cd services/scholarsearch/packages/omniroute && npm run build
+cd services/scholarsearch/apps/server && npm run build
+cd services/scholarsearch/apps/client && npm run build
 
 # Health check
 curl http://localhost:3001/health

@@ -54,6 +54,20 @@ services/scholarsearch/apps/client/.next/
 services/scholarsearch/apps/server/dist/
 services/scholarsearch/packages/*/dist/
 
+# ===== Swarm / batch transient artifacts =====
+batch_*.json
+batch_*.csv
+temp_thesis.txt
+Scoping_Review_Protocol_v6.0.md
+tui.json
+
+# ===== Mendeley patcher local DB + build =====
+services/mendeley-patcher/*.db
+services/mendeley-patcher/*.db-*
+services/mendeley-patcher/build/
+services/mendeley-patcher/dist/
+services/mendeley-patcher/output/
+
 # ===== OS / editor =====
 .DS_Store
 Thumbs.db

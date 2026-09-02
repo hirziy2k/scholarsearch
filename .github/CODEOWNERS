@@ -1,1 +1,11 @@
-* @pdf2pptx-team
+# Default owners for everything in the repo
+* @hirziy2k
+
+# PDF-to-PPTX engine
+/services/pdf-engine/ @hirziy2k
+
+# ScholarSearch
+/services/scholarsearch/ @hirziy2k
+
+# Mendeley Patcher
+/services/mendeley-patcher/ @hirziy2k
