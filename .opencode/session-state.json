@@ -110,13 +110,23 @@
       "path": ".opencode/swarm/test_day2.py",
       "last_edit": "2026-09-01T18:09:43.140553+00:00",
       "change_description": "5 Day 2 operational tests"
+    },
+    {
+      "path": ".gitignore",
+      "last_edit": "2026-09-02T00:52:42+00:00",
+      "change_description": "Patched ignore for batch exports"
+    },
+    {
+      "path": ".opencode/engine/model-aliases.json",
+      "last_edit": "2026-09-02T00:52:42+00:00",
+      "change_description": "Restored OmniRoute aliases"
     }
   ],
   "active_blockers": [],
-  "next_action_trigger": "Dashboard deployed. Awaiting user testing and feedback.",
+  "next_action_trigger": "Manual: upgrade Redis 3.0.504 -> 7+ (winget upgrade Redis.Redis), then verify XADD/XLEN and re-run test_streams.py",
   "meta": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-09-02T00:27:41.300556+00:00",
+    "last_updated": "2026-09-02T00:52:42+00:00",
     "session_count": 2,
     "total_tokens_saved": 0
   }
