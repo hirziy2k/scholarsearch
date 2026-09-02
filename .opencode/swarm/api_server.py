@@ -9,9 +9,10 @@ import os
 import asyncio
 import json
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import threading
+HTTPServer = ThreadingHTTPServer  # threaded for concurrent batch load (was single-threaded, died under 3-concurrent)
 
 swarm_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(swarm_dir)
