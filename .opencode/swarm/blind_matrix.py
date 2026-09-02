@@ -4,6 +4,8 @@ Single-pass contradiction classification using logit-masked 8B model.
 Enforces schema compliance at the inference layer via GBNF grammar.
 """
 
+import json
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
@@ -167,8 +169,26 @@ class BlindMatrixEvaluator:
         if not raw:
             return 4, None
 
+        # Handle Ollama JSON fallback: {"category":1,"boundary":"..."} or truncated JSON
+        if raw.startswith("{"):
+            try:
+                j = json.loads(raw)
+                return int(j.get("category", 4)), str(j.get("boundary", "")).strip() or None
+            except Exception:
+                # Try regex extract even from truncated JSON
+                import re as _re
+                m = _re.search(r'"category"\s*:\s*([1-4])', raw)
+                if m:
+                    bm = _re.search(r'"boundary"\s*:\s*"([^"]*)"', raw)
+                    return int(m.group(1)), (bm.group(1).strip() if bm and bm.group(1).strip() else None)
+                # Truncated — fall back to conflicted, no boundary
+                return 4, None
+
         parts = raw.split(" ", 1)
-        category_num = int(parts[0])
+        try:
+            category_num = int(parts[0])
+        except ValueError:
+            return 4, None
 
         if category_num < 1 or category_num > 4:
             category_num = 4

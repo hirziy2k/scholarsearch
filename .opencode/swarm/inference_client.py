@@ -76,12 +76,13 @@ class OllamaClient:
         self.temperature = float(os.environ.get("SWARM_MODEL_TEMPERATURE", str(temperature)))
         self.timeout = timeout
 
-    def generate(self, prompt: str, grammar: str = GBNF_GRAMMAR, max_tokens: int = 256, temperature: float = 0.1) -> str:
+    def generate(self, prompt: str, grammar: str = GBNF_GRAMMAR, max_tokens: int = 512, temperature: float = 0.1) -> str:
         temp = float(temperature) if temperature is not None else self.temperature
-        # Enforce GBNF via explicit output instruction appended to prompt
+        # Enforce GBNF via prompt — do NOT use format=json (GBNF is plain "1 boundary", not JSON)
         gbnf_instruction = (
             "\n\nSTRICT OUTPUT: Reply with exactly one line in GBNF format: '<category 1-4> <boundary 1-250 chars>'"
             " Example: '1 Population_Mismatch: optical zone 6mm'"
+            " Do not wrap in JSON."
         )
         full_prompt = prompt + gbnf_instruction
         body = json.dumps({
@@ -89,8 +90,6 @@ class OllamaClient:
             "prompt": full_prompt,
             "stream": False,
             "options": {"temperature": temp, "num_predict": max_tokens},
-            # JSON format hint — Ollama will try to emit JSON; we handle both JSON and raw
-            "format": "json",
         }).encode()
         req = urllib.request.Request(f"{self.base_url}/api/generate", data=body, headers={"Content-Type": "application/json"})
         try:
