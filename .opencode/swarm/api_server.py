@@ -182,14 +182,26 @@ class SwarmAPIHandler(BaseHTTPRequestHandler):
 
             from swarm.blind_matrix import BlindMatrixEvaluator, ContradictionType, EvidenceVerdict, CONTRADICTION_LABELS
             from swarm.inference_client import get_model_client
+            from swarm.literature_fetcher import fetch_support_and_contradiction, fetch_glossary_block
+
+            # Live triangulation via mcp-sources (OpenAlex) — falls back to static pools on network fail
+            try:
+                support_pool, contradiction_pool = fetch_support_and_contradiction(query)
+                glossary_block = fetch_glossary_block(support_pool, contradiction_pool)
+            except Exception as e:
+                print(f"[ingress] literature fetch failed, using static fallback: {e}")
+                support_pool = ["Atropine 0.01% showed 59% reduction in myopia progression"]
+                contradiction_pool = ["Orthokeratology demonstrated 43% slowing of axial elongation"]
+                glossary_block = None
 
             model_client, model_label = get_model_client()
             blind_matrix = BlindMatrixEvaluator(model_client)
-            evidence_summary = "Atropine 0.01% and orthokeratology both show significant myopia control efficacy in pediatric populations."
+            # Claim is the raw query; support/contradiction are live abstracts
             matrix_result = blind_matrix.evaluate(
-                evidence_summary,
-                ["Atropine 0.01% showed 59% reduction in myopia progression"],
-                ["Orthokeratology demonstrated 43% slowing of axial elongation"]
+                query,
+                support_pool,
+                contradiction_pool,
+                glossary_block,
             )
 
             response = {
