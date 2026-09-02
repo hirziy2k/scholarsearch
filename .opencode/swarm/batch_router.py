@@ -17,7 +17,10 @@ import urllib.error
 
 # Configuration
 API_BASE = "http://localhost:8084"
-MAX_CONCURRENT = 10  # Cap to prevent 8B model / Redis socket overload
+# Live 8B: 2-3 concurrent avoids VRAM eviction on consumer GPU (mock was 10)
+# Override via env SWARM_MAX_CONCURRENT
+import os as _os
+MAX_CONCURRENT = int(_os.environ.get("SWARM_MAX_CONCURRENT", "3"))
 BATCH_SIZE = 100     # Maximum queries per batch run
 
 
