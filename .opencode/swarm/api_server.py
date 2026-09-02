@@ -181,12 +181,10 @@ class SwarmAPIHandler(BaseHTTPRequestHandler):
             filter_result = pre_filter.evaluate(support_sources, contradiction_sources)
 
             from swarm.blind_matrix import BlindMatrixEvaluator, ContradictionType, EvidenceVerdict, CONTRADICTION_LABELS
+            from swarm.inference_client import get_model_client
 
-            class MockModelClient:
-                def generate(self, prompt, grammar, max_tokens, temperature):
-                    return "1 Population_Mismatch: Atropine and orthokeratology target different age groups"
-
-            blind_matrix = BlindMatrixEvaluator(MockModelClient())
+            model_client, model_label = get_model_client()
+            blind_matrix = BlindMatrixEvaluator(model_client)
             evidence_summary = "Atropine 0.01% and orthokeratology both show significant myopia control efficacy in pediatric populations."
             matrix_result = blind_matrix.evaluate(
                 evidence_summary,
@@ -220,7 +218,8 @@ class SwarmAPIHandler(BaseHTTPRequestHandler):
                     "contradiction_type": matrix_result.contradiction_label,
                     "boundary_condition": matrix_result.boundary_condition,
                     "support_count": matrix_result.support_count,
-                    "contradiction_count": matrix_result.contradiction_count
+                    "contradiction_count": matrix_result.contradiction_count,
+                    "model": model_label,
                 },
                 "pipeline_status": "COMPLETE",
                 "status": "processed",
