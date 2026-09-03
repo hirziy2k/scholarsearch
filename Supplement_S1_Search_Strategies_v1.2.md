@@ -99,4 +99,6 @@ AND
 4. Freeze only after PRESS sign-off; record PRESS date + reviewer initials in manifest Strategy Version.
 5. No searches count as data collection until OSF DOI issued; PRESS test runs are methods validation only and must be re-run post-registration per §11.8.
 
-**FREEZE STATUS: v1.2 PENDING SEED RE-CHECK — CLEARED FOR OSF REGISTRATION ONLY AFTER RE-CHECK. DO NOT EXECUTE DATA-COLLECTION SEARCHES UNTIL OSF DOI ISSUED.**
+**Seed re-check log (2026-09-03, PubMed, S1 v1.2 §1 strategy — methods validation only):** 4/5 retrieved — Deschamps 2013 (PMID 23706501) ✅; Tong 2010 (PMID 20489740) ✅; Wang 2017 (PMID 28622318) ✅; Woi 2025a (PMID 40138276) ✅; Kimlin 2016 (PMID 27350185) count 0 — DOCUMENTED EXPECTED GAP per item 2 above (instrument-validation paper, no DED indexing terms; captured via forward citation chasing per Protocol §10.3/PC-08, not topical retrieval). Malay OR-terms ("mata kering", "memandu malam", "pemanduan malam") ignored by PubMed phrase index — zero-match, benign. No syntax/timeout anomaly → no v1.3. Verdict: PASS with citation-chase-only exception for Kimlin 2016.
+
+**FREEZE STATUS: v1.2 FROZEN-PASSED — CLEARED FOR OSF REGISTRATION. DO NOT EXECUTE DATA-COLLECTION SEARCHES UNTIL OSF DOI ISSUED.**
