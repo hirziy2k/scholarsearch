@@ -2,7 +2,7 @@
 
 ## Dry Eye Disease, Dry-Eye Symptoms, and Night-Driving Difficulty Among Drivers
 
-**Protocol Reference:** Scoping_Review_Protocol_v7.0.md (v7.6 S1 v1.2 Malay arm; CR-02 to CR-07)
+**Protocol Reference:** Scoping_Review_Protocol_v7.6.md (v7.6 S1 v1.2 Malay arm; CR-02 to CR-07)
 **Version:** 1.6
 **Date:** September 2026
 **Status:** Pre-registration — DO NOT EXECUTE SEARCHES until OSF DOI issued (PC-05)
@@ -13,7 +13,7 @@
 
 This manual defines the operational workflow for executing the scoping review search. It separates **infrastructure execution** from **methodological protocol**. The protocol dictates the science; this manual dictates the infrastructure.
 
-**This document is not a substitute for the protocol.** All methodological decisions (eligibility criteria, search strategy, screening process, synthesis approach) are defined in `Scoping_Review_Protocol_v7.0.md` v7.6 (S1 v1.2 Malay arm; CR-02 to CR-07).
+**This document is not a substitute for the protocol.** All methodological decisions (eligibility criteria, search strategy, screening process, synthesis approach) are defined in `Scoping_Review_Protocol_v7.6.md` (S1 v1.2 Malay arm; CR-02 to CR-07).
 
 ---
 
