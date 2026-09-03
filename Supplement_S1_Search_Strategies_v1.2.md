@@ -2,7 +2,7 @@
 
 **Review:** Dry Eye Disease, Dry-Eye Symptoms, and Night-Driving Difficulty Among Drivers: A Scoping Review
 **Protocol:** Scoping_Review_Protocol_v7.6.md (CR-01–CR-07 audit amendments 2026-09-03 integrated)
-**Strategy version:** v1.2 — v1.1 + Malay recall arm (CR-02): C1 + "mata kering"; C2 + "memandu malam" OR "pemanduan malam" OR silau
+**Strategy version:** v1.2 + P-08 Lite harmonisation (2026-09-03) — v1.1 + Malay recall arm (CR-02): C1 + "mata kering"; C2 + "memandu malam" OR "pemanduan malam" OR silau; P-08 adds missing "pemanduan malam" to TRID/VisionCite Lite for cross-arm consistency (low-risk Malay OR-term delta per CR-02 precedent — re-run seed gate at execution; any anomaly → v1.3)
 **PRESS status:** v1.1 PASSED 6-domain audit; v1.2 delta (Malay OR-terms only) classified low-risk per CR-02 risk table — re-run seed gate at execution; any anomaly → v1.3 (CR-02 audit amendment 2026-09-03: delta verification requires reviewer initials + date in the manifest Strategy Version [MUST-FILL at execution]; full independent PRESS re-review required for any future substantive string change. Executable strings unchanged by this amendment — no v1.3 trigger.)
 **Seed validation set (must retrieve 5/5 where indexed):** Deschamps et al. 2013; Tong et al. 2010; Wang et al. 2017; Woi et al. 2025a; Kimlin et al. 2016
 **PRESS log note:** `driv*` unconstrained is an intentional sensitivity choice for scoping; high NNR accepted and documented. PC-09 four-minima gate (N + DED measure + night outcome + design) applies at screening regardless of retrieval breadth. Malay terms selected for low cross-language homograph risk (Information Specialist lens).
@@ -76,7 +76,7 @@ AND
 ```text
 ("dry eye" OR "keratoconjunctivitis sicca" OR "meibomian gland dysfunction" OR "tear film" OR OSDI OR TBUT OR "mata kering")
 AND
-(driving OR driver OR drivers OR "night vision" OR glare OR photophobia OR "contrast sensitivity" OR mesopic OR scotopic OR halos OR headlight OR headlamp OR "VND-Q" OR "memandu malam" OR silau)
+(driving OR driver OR drivers OR "night vision" OR glare OR photophobia OR "contrast sensitivity" OR mesopic OR scotopic OR halos OR headlight OR headlamp OR "VND-Q" OR "memandu malam" OR "pemanduan malam" OR silau)
 ```
 
 ## 8. VisionCite via ICO Native ("Lite")
@@ -86,7 +86,7 @@ AND
 ```text
 ("dry eye" OR "keratoconjunctivitis" OR "meibomian" OR "tear film" OR OSDI OR TBUT OR "mata kering")
 AND
-(driving OR driver OR drivers OR night OR glare OR photophobia OR "contrast sensitivity" OR halos OR headlight OR "VND-Q" OR "memandu malam" OR silau)
+(driving OR driver OR drivers OR night OR glare OR photophobia OR "contrast sensitivity" OR halos OR headlight OR "VND-Q" OR "memandu malam" OR "pemanduan malam" OR silau)
 ```
 
 ---

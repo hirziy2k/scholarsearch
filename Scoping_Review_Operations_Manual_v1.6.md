@@ -65,14 +65,14 @@ UKM PTSL → eResources@PTSL → RemoteXs → [Database]
 
 Before each database search:
 
-- [ ] Navigate to eResources@PTSL via RemoteXs
-- [ ] Confirm authenticated session is active
+- [ ] Navigate to eResources@PTSL via RemoteXs (EXCEPTION (P-04): PubMed/MEDLINE is free access via NCBI — no RemoteXs required)
+- [ ] Confirm authenticated session is active (where RemoteXs route applies)
 - [ ] Open target database
 - [ ] Verify search interface is accessible
 - [ ] Confirm OSF DOI issued — DO NOT SEARCH if no DOI (PC-05 gate)
 - [ ] Confirm database access verified (PC-07); if inaccessible record as not-searched
-- [ ] Enter approved search string (from Protocol Section 11 + Supplement S1 v1.2, including controlled vocab per PC-02/PC-03)
-- [ ] Apply only protocol-approved filters/limits — NO date limits (PC-04)
+- [ ] Enter approved search string from Supplement S1 v1.2 ONLY — Protocol §11 blocks are descriptive and MUST NOT be executed (P-04/PCR-01), including controlled vocab per PC-02/PC-03
+- [ ] Apply only protocol-approved filters/limits — NO date limits (PC-04); NO language or Human filters at search — language enforced at screening via E9 (P-05)
 - [ ] Record the **exact search string** used (copy verbatim) + Search Strategy Version (S1 v1.2)
 - [ ] Record the **total result count** displayed by the database
 - [ ] Record the **date and time** of search execution (must be ≥ OSF registration date)
@@ -154,6 +154,7 @@ scopus_2026-09-03_v1-batch2.manifest.md
 | Protocol Version | 7.6 |
 | Search Strategy ID | [e.g., Section 11.4 Master + S1 v1.2 PubMed] |
 | Search Strategy Version | [e.g., S1 v1.2, PRESS date + initials] |
+| Model Assistance (P-09) | [pure-code / model-assisted: mistral:7b-instruct ID 6577803aa9a0 + prompt version; prompt file + per-batch diff retained in logs/] |
 | Review Stage (PC-15/PC-17) | [Primary search / Update search N] |
 
 ## Execution
@@ -171,7 +172,7 @@ scopus_2026-09-03_v1-batch2.manifest.md
 |---|---|
 | Exact Search String | [Copy verbatim from database] |
 | Fields Searched | [e.g., Title/Abstract/MeSH, Emtree, MH headings] |
-| Filters/Limits Applied | [e.g., English, Malay, Human — NO date limits per PC-04] |
+| Filters/Limits Applied | [e.g., none — NO date limits per PC-04; NO language/Human filters at search; language enforced at screening via E9 (P-05)] |
 | Date Range (Applied Limits) | [None — record Database Coverage + Execution Date] |
 | Database Coverage | [e.g., MEDLINE 1946–present; Embase 1947–present] |
 | Language Limits | [e.g., English, Malay] |
@@ -194,7 +195,7 @@ scopus_2026-09-03_v1-batch2.manifest.md
 | Format | [e.g., RIS, CSV, NBIB, BibTeX] |
 | File Size | [e.g., 2.3 MB] |
 | Record Count (verified) | [Number — count records in file] |
-| SHA-256 Hash | [Optional — for integrity verification] |
+| SHA-256 Hash | [MANDATORY (P-11) — integrity verification required] |
 
 ## Notes
 
@@ -275,7 +276,7 @@ Deduplication occurs **after all database exports have been ingested.**
 | 2 | PMID | Exact match |
 | 3 | Database ID | Exact match (Scopus EID, WoS accession number, etc.) |
 | 4 | Title + Author + Year | Normalized title (lowercase, punctuation removed) + first author surname + publication year |
-| 5 | Title similarity | Fuzzy match (Levenshtein distance > 90%) — manual review required |
+| 5 | Title similarity | Fuzzy match (Levenshtein distance > 90%) — manual review required. Normalisation/tokeniser (P-10): lowercase + punctuation-strip + whitespace-collapse; tokeniser/disclosure logged in methods; threshold + version recorded per dedup run |
 
 **Output:** Deduplicated record set in `processed/` with:
 - Original database provenance preserved
@@ -390,7 +391,7 @@ scopus_2026-09-03_v1-batch1_merged.ris   (derived merged file — logged in mani
 | Session hijacking | Violates authentication boundary |
 | Bulk PDF download | Violates provider restrictions |
 | CAPTCHA bypass | Violates anti-automation controls |
-| LLM/AI screening, eligibility, charting, synthesis | Protocol §15.1 (PC-12) — human judgement only; deterministic parsing/dedup/hashing/DOI-batch only |
+| LLM/AI screening, eligibility, charting, synthesis | Protocol §15.1 (PC-12) — human judgement only; deterministic parsing/dedup/hashing/DOI-batch only; where LLM assists parsing, versioned prompt file + per-batch diff retained, manifest Model Assistance field completed (P-09) |
 
 ---
 
@@ -400,7 +401,7 @@ scopus_2026-09-03_v1-batch1_merged.ris   (derived merged file — logged in mani
 
 - [ ] Confirm OSF DOI issued (PC-05 gate) + database access verified per §10.1.1 (PC-07); record accessible/inaccessible + reason
 - [ ] Navigate to database via RemoteXs
-- [ ] Execute approved search string (Protocol §11 + S1 v1.2 incl. controlled vocab)
+- [ ] Execute approved search string (Supplement S1 v1.2 ONLY incl. controlled vocab — Protocol §11 MUST NOT be executed per P-04/PCR-01)
 - [ ] Apply protocol-approved filters (NO date limits per PC-04)
 - [ ] Record exact search string + Strategy Version (S1 v1.2)
 - [ ] Record total result count
@@ -449,8 +450,9 @@ scopus_2026-09-03_v1-batch1_merged.ris   (derived merged file — logged in mani
 1. Run search in Web of Science
 2. Click "Export" → "Other file formats"
 3. Format: "Plain text file" (Record Content: "Full Record and Cited References")
-4. Save to `raw/web-of-science/`
-5. File naming: `wos_ded_nightdriving_[YYYY-MM-DD]_[batch].txt`
+4. Convert `.txt` export to RIS before ingestion (P-07 — ingestion pipeline expects RIS/CSV/NBIB/BibTeX per §4.1; retain BOTH the original `.txt` and converted `.ris` in `raw/web-of-science/`, log conversion method + SHA-256 of both files in manifest) — OR export directly to RIS where the entitlement permits
+5. Save to `raw/web-of-science/`
+6. File naming: `wos_ded_nightdriving_[YYYY-MM-DD]_[batch].txt` (+ `.ris` converted twin)
 
 ### A.4 Embase
 
@@ -470,7 +472,7 @@ scopus_2026-09-03_v1-batch1_merged.ris   (derived merged file — logged in mani
 
 ### A.6 TRID
 
-1. Run search in TRID (via EBSCOhost or ProQuest)
+1. Run search in TRID via TRB native FIRST (P-06 — preferred per Protocol §10.1; EBSCOhost/ProQuest acceptable only with translation log)
 2. Export as RIS or CSV
 3. Save to `raw/trid/`
 4. File naming: `trid_ded_nightdriving_[YYYY-MM-DD].ris`
@@ -481,6 +483,13 @@ scopus_2026-09-03_v1-batch1_merged.ris   (derived merged file — logged in mani
 2. Export as RIS or CSV
 3. Save to `raw/visioncite/`
 4. File naming: `visioncite_ded_nightdriving_[YYYY-MM-DD].ris`
+
+### A.8 Cochrane Library (CENTRAL + CDSR via Wiley) (P-06)
+
+1. Run S1 v1.2 §3 strategy in Cochrane Library via Wiley (MeSH `[mh]` + `:ti,ab,kw`)
+2. Export as RIS; batch by year/date if Wiley caps results — preserve ALL batches in `raw/cochrane/`
+3. File naming: `cochrane_ded_nightdriving_[YYYY-MM-DD]_[batch].ris`
+4. Label manifest Review Stage = Primary search; role = primary DB yield counted ONCE under Protocol §10.1 (PCR-04) — do NOT double-count §10.2 citation-chasing/strategy-mining hits; label any chase batches separately in the citation-chasing log
 
 ---
 
@@ -516,7 +525,7 @@ scopus_2026-09-03_v1-batch1_merged.ris   (derived merged file — logged in mani
 |---|---|
 | Exact Search String | (("dry eye"[tiab] OR "Dry Eye Syndromes"[MeSH] OR ...) AND ("night driving"[tiab] OR "Automobile Driving"[MeSH] OR ...) AND ("driver"[tiab] OR ...)) |
 | Fields Searched | Title/Abstract/MeSH |
-| Filters/Limits Applied | English, Malay, Human — NO date limits (PC-04) |
+| Filters/Limits Applied | English, Malay — NO date limits (PC-04); NO language/Human filters applied at search (P-05); language enforced at screening via E9 |
 | Date Range (Applied Limits) | None — MEDLINE 1946–present, searched 2026-09-03 |
 | Language Limits | English, Malay |
 

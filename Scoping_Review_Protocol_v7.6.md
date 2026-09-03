@@ -298,7 +298,7 @@ Woi et al. (2025b) [Medicine & Health, INDEPENDENT STUDY, n=120]
 | Cochrane Library (CENTRAL + CDSR) via Wiley (PC-16) | Inception–present | Free (abstracts); VERIFY full-text via UKM PTSL | Gold-standard trials + systematic reviews; captures driving-vision trials missed by primary indices |
 | VisionCite via ICO native | Specialist index (~110 optometry/vision journals) | Paid — attempt; if inaccessible record as limitation per PC-06 | Supplementary DED/ocular-surface coverage |
 
-**Total: 8 databases (PC-01 + PC-16).** Access verification checkpoint required before Day 6. Outcome recorded in each manifest. If a database is inaccessible, document as not-searched explicitly — do not silently omit. VisionCite fallback: if inaccessible, rely on MEDLINE + Embase + CINAHL overlap and note as limitation.
+**Total: 8 databases (PC-01 + PC-16).** Access verification checkpoint required before Day 6. Outcome recorded in each manifest. If a database is inaccessible, document as not-searched explicitly — do not silently omit. VisionCite fallback: if inaccessible, rely on MEDLINE + Embase + CINAHL overlap and note as limitation. Cochrane appears once as primary DB here (§10.1); §10.2 entry is strategy-mining/citation-chasing only — not a second count (PCR-04).
 
 #### 10.1.1 Access Verification Protocol (PC-06/PC-07)
 
@@ -354,22 +354,13 @@ All search strategies will be deposited as supplementary material and on OSF.
 
 ### 11. Search Strategy
 
+> **DESCRIPTIVE — DO NOT EXECUTE §§11.1–11.3/11.5–11.7; execute Supplement S1 v1.2 only (PCR-01).**
+
 #### 11.1 Concept 1: Dry Eye Disease / Dry-Eye Symptoms
 
-```
-"dry eye" OR "dry eye disease" OR "dry eye syndrome" OR "DED"
-OR "dry-eye" OR "keratoconjunctivitis sicca" OR "ocular surface disease"
-OR "tear film instability" OR "tear break-up time" OR "TBUT" OR "NIBUT"
-OR "non-invasive break-up time" OR "tear film break up time"
-OR "meibomian gland dysfunction" OR "MGD" OR "aqueous deficient dry eye"
-OR "evaporative dry eye" OR "OSDI" OR "ocular surface disease index"
-OR "SPEED" OR "standard patient evaluation of eye dryness"
-OR "dry eye questionnaire" OR "DEQ" OR "CLDEQ"
-OR "contact lens dry eye questionnaire" OR "IDEEL"
-OR "impact of dry eye on everyday life" OR "dry eye symptoms"
-OR "ocular symptoms" AND ("dry" OR "dryness" OR "grittiness" OR
-"burning" OR "foreign body sensation")
-```
+> **DESCRIPTIVE — DO NOT EXECUTE; execute S1 v1.2 only.**
+
+Free-text terms consolidated to Supplement S1 v1.2 (sole executable, P-12). Concept scope: dry eye / dry-eye disease/syndrome / DED / keratoconjunctivitis sicca / ocular surface disease / tear film instability / break-up time (TBUT/NIBUT variants) / meibomian gland dysfunction / aqueous-deficient + evaporative subtypes / OSDI, SPEED, DEQ, CLDEQ, IDEEL instruments / dry-eye symptoms (dryness, grittiness, burning, foreign-body sensation).
 
 **Controlled vocabulary — Concept 1 (PC-02):**
 - PubMed MeSH: `"Dry Eye Syndromes"[MeSH]`, `"Keratoconjunctivitis Sicca"[MeSH]`, `"Tears"[MeSH]`, `"Meibomian Glands"[MeSH]`
@@ -379,28 +370,15 @@ OR "ocular symptoms" AND ("dry" OR "dryness" OR "grittiness" OR
 
 #### 11.2 Concept 2: Night Driving / Low-Light Driving
 
-```
-"night driving" OR "night-time driving" OR "nighttime driving"
-OR "driving at night" OR "driving in low light" OR "mesopic driving"
-OR "scotopic driving" OR "low-light driving" OR "dim light driving"
-OR "driving difficulty" OR "driving performance" AND ("night" OR
-"low light" OR "mesopic") OR "glare" AND ("driving" OR "headlight"
-OR "headlamp") OR "disability glare" OR "discomfort glare" AND "driving"
-OR "VND-Q" OR "vision and night driving questionnaire"
-OR "night driving difficulty" OR "night driving problem"
-OR "driving safety" AND ("night" OR "visibility")
-OR "contrast sensitivity" AND ("driving" OR "night")
-OR "higher order aberrations" OR "HOAs" AND ("driving" OR "night")
-OR "visual performance" AND ("driving" OR "night" OR "mesopic")
-```
+> **DESCRIPTIVE — DO NOT EXECUTE; execute S1 v1.2 only.**
+
+Free-text terms consolidated to Supplement S1 v1.2 (sole executable, P-12). Concept scope: night/night-time/nighttime driving, driving at night / in low light, mesopic/scotopic/low-light/dim-light driving, driving difficulty + performance at night, glare (disability/discomfort, headlight/headlamp), VND-Q and night-driving difficulty/problems, driving safety + visibility, contrast sensitivity / HOAs / visual performance at night.
 
 #### 11.3 Concept 3: Drivers / Driving
 
-```
-"driver" OR "drivers" OR "driving" OR "motor vehicle" AND ("driver"
-OR "driving") OR "automobile driver" OR "car driver" OR "licensed driver"
-OR "active driver" OR "road safety" AND ("driver" OR "driving")
-```
+> **DESCRIPTIVE — DO NOT EXECUTE; execute S1 v1.2 only.**
+
+Free-text terms consolidated to Supplement S1 v1.2 (sole executable, P-12). Concept scope: driver/drivers/driving, motor-vehicle + automobile/car/licensed/active driver variants, road safety in driver/driving context.
 
 **Controlled vocabulary — Concepts 2 + 3 (PC-02):**
 - PubMed MeSH: `"Automobile Driving"[MeSH]`, `"Dark Adaptation"[MeSH]`, `"Vision, Low"[MeSH]`, `"Glare"[MeSH]`, `"Photophobia"[MeSH]`, `"Contrast Sensitivity"[MeSH]`, `"Visual Acuity"[MeSH]`
@@ -440,55 +418,23 @@ AND "driver"[tiab])
 
 #### 11.5 Grey-Literature Search String (Adapted)
 
-**ProQuest Dissertations & Theses:**
-```sql
-AB("dry eye" OR "dry-eye" OR "keratoconjunctivitis sicca")
-AND AB("night driving" OR "driving at night" OR "driving difficulty"
-OR "driving performance")
-AND AB("driver" OR "driving")
-```
+> **DESCRIPTIVE — DO NOT EXECUTE; execute S1 v1.2 only.**
 
-**OSF Preprints / medRxiv / bioRxiv:**
-```sql
-"dry eye" AND ("night driving" OR "driving at night")
-```
-
-**Conference abstracts (ARVO, BCLA, AAOS):**
-```sql
-"dry eye" AND ("night driving" OR "driving difficulty"
-OR "driving performance") AND ("driver" OR "driving")
-```
+Grey-literature adaptations consolidated to the PC-10 log format (source + exact syntax + URL + sections + date + hits reviewed); executable grey strings live in Supplement S1 operating notes (P-12). Adaptation scope: ProQuest 3-line AB() (DED AND night-driving AND driver); OSF/medRxiv/bioRxiv 2-concept (`"dry eye" AND ("night driving" OR "driving at night")`); conference (ARVO/BCLA/AAOS) 3-line.
 
 **Note (PC-03):** The master strategy + all 8 translations were PRESS peer-reviewed and frozen as Supplement S1 v1.2 (Malay arm added post-PRESS per CR-02; seed re-check at execution). Syntax translated per platform; translation log retained. No searches executed before OSF DOI. (CR-02 audit amendment 2026-09-03: the v1.2 Malay-only delta requires second-reviewer verification — record reviewer initials + date in the manifest Strategy Version [MUST-FILL at execution]; full independent PRESS re-review is required for any future substantive string change, logged per PRISMA-S item 15.)
 
 #### 11.6 CINAHL Search String (Adapted)
 
-```
-("dry eye" OR "dry eye disease" OR "dry eye syndrome" OR "keratoconjunctivitis sicca"
-OR "ocular surface disease" OR "tear film instability" OR "tear break-up time"
-OR "meibomian gland dysfunction" OR "OSDI" OR "dry-eye" OR "dry eye symptoms")
+> **DESCRIPTIVE — DO NOT EXECUTE; execute S1 v1.2 only.**
 
-AND
-
-("night driving" OR "driving at night" OR "driving difficulty" OR "driving performance"
-OR "low light driving" OR "mesopic" OR "glare" AND "driving"
-OR "contrast sensitivity" AND "driving")
-
-AND
-
-("driver" OR "drivers" OR "driving" OR "motor vehicle")
-```
+CINAHL adaptation consolidated to Supplement S1 v1.2 §6 (sole executable: MH headings + TI/AB Malay arm, P-12). Adaptation scope: 3-concept (DED AND night-driving AND driver) with dry-eye / keratoconjunctivitis / tear-film / break-up / OSDI terms AND night-driving / low-light / mesopic / glare / contrast-sensitivity terms AND driver nouns.
 
 #### 11.7 VisionCite Search String (Adapted)
 
-```
-("dry eye" OR "DED" OR "tear film" OR "OSDI" OR "keratoconjunctivitis sicca")
+> **DESCRIPTIVE — DO NOT EXECUTE; execute S1 v1.2 only.**
 
-AND
-
-("night driving" OR "driving" OR "driving performance" OR "driving difficulty"
-OR "mesopic" OR "glare" OR "contrast sensitivity")
-```
+VisionCite adaptation consolidated to Supplement S1 v1.2 §8 (sole executable: simplified 2-concept free-text + Malay arm, P-12). Adaptation scope: (dry eye / DED / tear film / OSDI / keratoconjunctivitis) AND (night driving / driving / performance / difficulty / mesopic / glare / contrast sensitivity).
 
 **Note (PC-01/PC-02/PC-03/PC-06):** CINAHL uses MH headings above; VisionCite uses simplified 2-concept free-text (small index, no complex nesting) in Supplement S1. Searches executed only after OSF DOI and PRESS freeze, on [date]. VisionCite access via paid subscription and may be inaccessible — if so, record as limitation and rely on MEDLINE + Embase + CINAHL overlap (see Section 20). Protocol §§11.5–11.7 strings are descriptive adaptations only; Supplement S1 v1.2 holds the sole authoritative executables (CR-05 audit amendment 2026-09-03).
 
@@ -564,7 +510,7 @@ OR "mesopic" OR "glare" OR "contrast sensitivity")
 **Step 3: Single-reviewer charting with spot-checks**
 - One reviewer charts all remaining studies
 - Second reviewer independently charts 30% of remaining studies (randomly selected) (CR-03 audit uplift 2026-09-03: raised from 20% given the small expected evidence set)
-- Discrepancies resolved by discussion; charting form clarified if needed
+- Discrepancies resolved by discussion; charting form clarified if needed; unresolved charting disputes → arbiter; log form clarifications (PCR-02)
 
 #### 13.2 Data Charting Form
 
@@ -599,14 +545,14 @@ OR "mesopic" OR "glare" OR "contrast sensitivity")
 | DED diagnostic criteria | Text | Specific criteria applied (if reported) |
 | DED assessment type | Categorical | Questionnaire only, Clinical tests only, Combined, Not stated |
 | Dry-eye symptom instrument | Text | OSDI, SPEED, DEQ, CLDEQ, IDEEL, VND-Q, NEI-VFQ, Custom (specify), Other (specify) |
-| Dry-eye symptom instrument validated? | Categorical | Yes (cite validation study), No, Not stated |
+| Dry-eye symptom instrument validated? | Categorical | Yes (cite validation study + log numeric metrics where reported, e.g., CVI/α) (P-03), No, Not stated |
 | Clinical DED measures | Text | TBUT, NIBUT, Schirmer, Osmolarity, Corneal staining, Meibography, Other (specify) |
 | DED severity distribution | Text | Mild/moderate/severe breakdown (if reported) |
 | **Night-driving assessment** | | |
 | Night-driving definition | Text | How the study defines "night driving" or "low-light driving" |
 | Night-driving assessment type | Categorical | Self-report questionnaire, Driving simulator, On-road test, Naturalistic driving, Crash data, Combined, Other (specify) |
 | Night-driving instrument | Text | VND-Q, VND-Q-M, NDQ, LLQ, Custom (specify), Other (specify) |
-| Night-driving instrument validated? | Categorical | Yes (cite validation study), No, Not stated |
+| Night-driving instrument validated? | Categorical | Yes (cite validation study + log numeric metrics where reported, e.g., CVI/α) (P-03), No, Not stated |
 | Simulator type (if applicable) | Text | Platform name, visual environment, scenario details |
 | On-road protocol (if applicable) | Text | Route, time of day, lighting conditions |
 | **Intermediate visual measures** | | |
@@ -673,6 +619,8 @@ OR "mesopic" OR "glare" OR "contrast sensitivity")
 | Complete charting data | CSV | Supplementary material |
 | Excluded studies with reasons | Table | Supplementary material |
 | Search strategies for all databases | PDF | Supplementary material |
+| Completed PRISMA-ScR checklist | PDF | Supplementary material + OSF (P-01) |
+| Completed PRISMA-S checklist (16 items) | PDF | Supplementary material + OSF (P-02) |
 
 ---
 
@@ -695,7 +643,7 @@ OR "mesopic" OR "glare" OR "contrast sensitivity")
 
 No generative AI or Large Language Models (LLMs) will be used for title/abstract screening, full-text eligibility decisions, data charting, or thematic synthesis. All methodological and clinical decisions are strictly performed by human reviewers.
 
-A local LLM pipeline (`mistral:7b-instruct`, local Ollama deployment, model ID `6577803aa9a0`) is authorized strictly for administrative and deterministic infrastructure tasks, specifically: RIS/NBIB/CSV metadata parsing, exact-match deduplication across database exports, SHA-256 hashing of raw export files, and batch DOI retrieval for forward citation chasing. All model-assisted operations mandate 100% human-in-the-loop verification against original source records. Wider deterministic automation (file detection, manifest generation, and ingestion logging) is governed directly by the Operations Manual (§8). Any expansion of model-assisted tasks will be logged as a formal protocol amendment.
+A local LLM pipeline (`mistral:7b-instruct`, local Ollama deployment, model ID `6577803aa9a0`) is authorized strictly for administrative and deterministic infrastructure tasks, specifically: RIS/NBIB/CSV metadata parsing, exact-match deduplication across database exports, SHA-256 hashing of raw export files, and batch DOI retrieval for forward citation chasing. All model-assisted operations mandate 100% human-in-the-loop verification against original source records. Wider deterministic automation (file detection, manifest generation, and ingestion logging) is governed directly by the Operations Manual (§8). Any expansion of model-assisted tasks will be logged as a formal protocol amendment. (P-09) Where a local LLM assists metadata parsing, the versioned prompt file and per-batch output diff against source records are retained in `logs/`, and the manifest records model-assisted vs pure-code batches (model name + ID + prompt version).
 
 ---
 
@@ -763,6 +711,8 @@ SR_DED_NightDriving/
 - For grey literature: manually import into `02_Grey_Literature/` with appropriate sub-folder
 
 **Step 2: Initial deduplication (Mendeley automatic)**
+
+> **Dedup locus (PCR-03):** Local pipeline dedup = staging; Mendeley `03_Deduplicated/` = master library.
 - Mendeley's built-in duplicate detection identifies identical records
 - Review and merge duplicates, retaining the record with the most complete metadata
 
@@ -922,6 +872,8 @@ Any amendments to this protocol will be documented, justified, and registered as
 
 **Amendment record CR-01–CR-07 (2026-09-03, pre-registration benchmark audit):** documentation-only amendments — language justification (CR-01, §8.1/§20), PRESS re-review logging rule (CR-02, §11.4), charting spot-check 20%→30% (CR-03, §13.1), E6/E7 disambiguation (CR-06, §12.2), related-article cap rationale (CR-07, §10.3), S1 authority pointer (CR-05, §11.6–11.7). No eligibility, search-string, or synthesis change. Approved [initials — MUST-FILL]; registered as OSF versioned update pre-DOI.
 
+**Amendment record PCR-01–PCR-05 (2026-09-03, approved clarifiers):** doc-only — S1-only banners §§11.1–11.3/11.5–11.7 (PCR-01), charting arbiter line §13.1 (PCR-02), dedup locus §16.3 (PCR-03), Cochrane single-count footnote §10.1 (PCR-04), references header §23 (PCR-05). No eligibility, string, DB, or synthesis change. Backup: `backup_pre-PCR01-05_20260903_Scoping_Review_Protocol_v7.6.md`.
+
 ---
 
 ### 22. Ethics and Dissemination
@@ -933,6 +885,8 @@ Any amendments to this protocol will be documented, justified, and registered as
 ---
 
 ### 23. References
+
+> **Background only — not an included-study list (PCR-05).**
 
 Al-Mohtaseb, Z., Schachter, S., Shen Lee, B., Garlich, J. & Trattler, W. 2021. The relationship between dry eye disease and digital screen use. *Clinical Ophthalmology* 15: 3811–3820.
 
