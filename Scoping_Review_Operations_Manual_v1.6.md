@@ -312,16 +312,16 @@ If the same database is searched again (e.g., monthly update):
 If manual export is interrupted mid-process:
 
 1. **Document** — record what was exported, what was not
-2. **Save partial export** — keep the incomplete file in `raw/` with `_partial` suffix
-3. **Resume** — continue export in next session
-4. **Merge** — combine partial and complete exports into single raw file
-5. **Update manifest** — document the interruption and recovery
+2. **Save partial export** — keep the incomplete file in `raw/` with `_partial` suffix (immutable; never overwrite or delete)
+3. **Resume** — continue export in next session into a `_complete` file
+4. **Merge (logged, non-destructive)** — combine parts via scripted concatenation into a `_merged` file; BOTH source parts are retained in `raw/` (CR-04 audit amendment 2026-09-03: merging in place into a single file would violate the immutable-vault rule)
+5. **Update manifest** — document the interruption and recovery: record filenames + SHA-256 of the `_partial`, `_complete`, and `_merged` files plus the merge method
 
 Example:
 ```
-scopus_2026-09-03_v1-batch1_partial.ris  (interrupted)
-scopus_2026-09-03_v1-batch1_complete.ris (resumed and completed)
-scopus_2026-09-03_v1-batch1.ris          (merged final)
+scopus_2026-09-03_v1-batch1_partial.ris  (interrupted — RETAINED)
+scopus_2026-09-03_v1-batch1_complete.ris (resumed and completed — RETAINED)
+scopus_2026-09-03_v1-batch1_merged.ris   (derived merged file — logged in manifest)
 ```
 
 ---
@@ -416,7 +416,7 @@ scopus_2026-09-03_v1-batch1.ris          (merged final)
 - [ ] All 8 databases searched (or explicitly recorded as not-searched with reason per §10.1.1)
 - [ ] Access verification log complete (Days 1–5 outcomes per database)
 - [ ] All grey-literature sources searched with URL + exact syntax + sections + date + hits reviewed (PC-10)
-- [ ] Citation chasing completed (backward=all; forward=all via batch DOI; related=top-10 by citations; PC-08)
+- [ ] Citation chasing completed (backward=all; forward=all via batch DOI; related=top-10 highest-cited with count source + date recorded per CR-07; PC-08)
 - [ ] All raw files in `raw/` with manifests
 - [ ] All manifests in `manifests/`
 - [ ] Ingestion QC passed

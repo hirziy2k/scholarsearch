@@ -2,7 +2,7 @@
 
 ## Dry Eye Disease, Dry-Eye Symptoms, and Night-Driving Difficulty Among Drivers: A Scoping Review
 
-**Version:** 7.6 (CR-02 to CR-07 integrated — S1 v1.2 Malay arm; inline archival; Cochrane role; Scenario B disclosure; exemplar sweep; Woi safeguards)
+**Version:** 7.6 + CR-01–CR-07 audit amendments (2026-09-03) (CR-02 to CR-07 integrated — S1 v1.2 Malay arm; inline archival; Cochrane role; Scenario B disclosure; exemplar sweep; Woi safeguards)
 **Date:** September 2026
 **Status:** Pre-registration — DO NOT EXECUTE SEARCHES until OSF DOI issued
 
@@ -180,6 +180,8 @@ To map the available evidence on the relationship between DED/dry-eye symptoms a
 
 **Language-recall note (CR-02):** Malay eligibility is executed via the Malay OR-arm in S1 v1.2 ("mata kering"; "memandu malam" / "pemanduan malam"; silau). English-only execution would under-retrieve Malay records without English abstracts.
 
+**Language-restriction justification (CR-01 audit amendment 2026-09-03):** Restriction to English and Malay reflects review-team language capacity and the Malaysian study context (validated Malay instruments OSDI-M and VND-Q-M; Malay thesis and grey sources). Other-language records are excluded at screening (E9 — specify language); reference lists of excluded non-English studies are hand-searched and the restriction is reported as a limitation (see Section 20).
+
 #### 8.2 Detailed Inclusion Criteria
 
 **Population:**
@@ -330,7 +332,7 @@ Formal pre-execution checkpoint (Days 1–5, before OSF-gated search start): ver
 
 - Backward citation searching: hand-search reference lists of all included studies and all relevant systematic/scoping reviews identified via Epistemonikos and Cochrane Library. Prior to freezing S1 v1.2, mine published strategies from relevant Epistemonikos/CDSR reviews on DED and driving to extract/adapt controlled and free-text terms (PC-20).
 - Forward citation searching (PC-08): forward-track ALL included studies via batch DOI queries in Scopus and Web of Science; also track key review papers. Record platform, date, and hits per batch in the citation-chasing log.
-- Related-article searching (PC-08): use PubMed "Similar articles" and Scopus "Related documents", restricted to the top 10 included studies ranked objectively by highest citation count (record count source + date) to eliminate subjective "most relevant" selection.
+- Related-article searching (PC-08): use PubMed "Similar articles" and Scopus "Related documents", restricted to the top 10 included studies ranked objectively by highest citation count (record count source + date) to eliminate subjective "most relevant" selection. (CR-07 audit amendment 2026-09-03: the cap of 10 is a feasibility bound for a student-timeline review, not a relevance judgement; citation-count source — Scopus or WoS — plus date and yield are logged per batch per PRISMA-S item 5 and reported in the citation-chasing log.)
 - Author searching: forward-search corresponding authors of included studies for additional publications (limit to corresponding authors for feasibility)
 - Author contact for missing data (up to two email attempts)
 
@@ -457,7 +459,7 @@ AND AB("driver" OR "driving")
 OR "driving performance") AND ("driver" OR "driving")
 ```
 
-**Note (PC-03):** The master strategy + all 8 translations were PRESS peer-reviewed and frozen as Supplement S1 v1.2 (Malay arm added post-PRESS per CR-02; seed re-check at execution). Syntax translated per platform; translation log retained. No searches executed before OSF DOI.
+**Note (PC-03):** The master strategy + all 8 translations were PRESS peer-reviewed and frozen as Supplement S1 v1.2 (Malay arm added post-PRESS per CR-02; seed re-check at execution). Syntax translated per platform; translation log retained. No searches executed before OSF DOI. (CR-02 audit amendment 2026-09-03: the v1.2 Malay-only delta requires second-reviewer verification — record reviewer initials + date in the manifest Strategy Version [MUST-FILL at execution]; full independent PRESS re-review is required for any future substantive string change, logged per PRISMA-S item 15.)
 
 #### 11.6 CINAHL Search String (Adapted)
 
@@ -488,7 +490,7 @@ AND
 OR "mesopic" OR "glare" OR "contrast sensitivity")
 ```
 
-**Note (PC-01/PC-02/PC-03/PC-06):** CINAHL uses MH headings above; VisionCite uses simplified 2-concept free-text (small index, no complex nesting) in Supplement S1. Searches executed only after OSF DOI and PRESS freeze, on [date]. VisionCite access via paid subscription and may be inaccessible — if so, record as limitation and rely on MEDLINE + Embase + CINAHL overlap (see Section 20).
+**Note (PC-01/PC-02/PC-03/PC-06):** CINAHL uses MH headings above; VisionCite uses simplified 2-concept free-text (small index, no complex nesting) in Supplement S1. Searches executed only after OSF DOI and PRESS freeze, on [date]. VisionCite access via paid subscription and may be inaccessible — if so, record as limitation and rely on MEDLINE + Embase + CINAHL overlap (see Section 20). Protocol §§11.5–11.7 strings are descriptive adaptations only; Supplement S1 v1.2 holds the sole authoritative executables (CR-05 audit amendment 2026-09-03).
 
 #### 11.8 Search Update Strategy (PC-15)
 
@@ -530,10 +532,12 @@ OR "mesopic" OR "glare" OR "contrast sensitivity")
 | E3 | Wrong population (non-drivers only) |
 | E4 | Wrong study design (review, editorial, commentary, case report) |
 | E5 | Conference abstract without sufficient data |
-| E6 | Duplicate publication (same dataset, same analysis, same findings) |
-| E7 | Companion report (same dataset as included primary report; see Section 17.3) |
+| E6 | Duplicate publication — identical or near-identical content (e.g., verbatim thesis-chapter article, same article in two journals); keep the most authoritative version (see §17.1–17.2) |
+| E7 | Companion report — same dataset but different analysis/framing as an included primary report; recorded as companion, not counted in numerical synthesis (see §17.1, §17.3) |
 | E8 | Full text not retrievable |
 | E9 | Other (specify) |
+
+**E6 vs E7 disambiguation rule (CR-06 audit amendment 2026-09-03):** identical content → E6 (exclude duplicate); same data with different analysis → E7 (companion). Apply §17.1 definitions; borderline cases go to the arbiter.
 
 #### 12.3 Documentation
 
@@ -559,7 +563,7 @@ OR "mesopic" OR "glare" OR "contrast sensitivity")
 
 **Step 3: Single-reviewer charting with spot-checks**
 - One reviewer charts all remaining studies
-- Second reviewer independently charts 20% of remaining studies (randomly selected)
+- Second reviewer independently charts 30% of remaining studies (randomly selected) (CR-03 audit uplift 2026-09-03: raised from 20% given the small expected evidence set)
 - Discrepancies resolved by discussion; charting form clarified if needed
 
 #### 13.2 Data Charting Form
@@ -900,7 +904,7 @@ Because the lead reviewer is also an author of the thesis, the draft manuscript,
 | Variation in night-driving measures | Self-report, simulator, on-road, naturalistic | Data charting captures measure type; stratification by measure type |
 | Heterogeneity of evidence | Clinical studies, surveys, simulator studies, on-road tests | Scoping review designed for heterogeneous evidence; synthesis is descriptive |
 | Geographic bias | Evidence may be concentrated in high-income countries | Data charting captures geography; gap analysis identifies underrepresented regions |
-| Language restriction | English and Malay only | Acknowledged as limitation; reference lists of non-English studies hand-searched |
+| Language restriction | English and Malay only | Acknowledged as limitation (justification: §8.1 language note); reference lists of non-English studies hand-searched |
 | Full-text retrieval | Some articles may not be accessible | Interlibrary loan; author contact; institutional access |
 | Inter-rater reliability | Disagreements during screening/charting | Calibration phases; clear definitions; arbitration process |
 | Grey-literature retrieval | Theses and unpublished manuscripts may be difficult to locate | Multiple grey-literature databases; author contact; institutional repositories |
@@ -915,6 +919,8 @@ Because the lead reviewer is also an author of the thesis, the draft manuscript,
 ### 21. Amendments
 
 Any amendments to this protocol will be documented, justified, and registered as protocol updates on OSF. Major changes (e.g., eligibility criteria, search strategy) will be reported in the final manuscript.
+
+**Amendment record CR-01–CR-07 (2026-09-03, pre-registration benchmark audit):** documentation-only amendments — language justification (CR-01, §8.1/§20), PRESS re-review logging rule (CR-02, §11.4), charting spot-check 20%→30% (CR-03, §13.1), E6/E7 disambiguation (CR-06, §12.2), related-article cap rationale (CR-07, §10.3), S1 authority pointer (CR-05, §11.6–11.7). No eligibility, search-string, or synthesis change. Approved [initials — MUST-FILL]; registered as OSF versioned update pre-DOI.
 
 ---
 
