@@ -175,7 +175,7 @@ scopus_2026-09-03_v1-batch2.manifest.md
 | Filters/Limits Applied | [e.g., none — NO date limits per PC-04; NO language/Human filters at search; language enforced at screening via E9 (P-05)] |
 | Date Range (Applied Limits) | [None — record Database Coverage + Execution Date] |
 | Database Coverage | [e.g., MEDLINE 1946–present; Embase 1947–present] |
-| Language Limits | [e.g., English, Malay] |
+| Language Limits | [e.g., None at search — English + Malay enforced at screening via E9 (P-05)] |
 
 ## Results
 
@@ -525,9 +525,9 @@ scopus_2026-09-03_v1-batch1_merged.ris   (derived merged file — logged in mani
 |---|---|
 | Exact Search String | (("dry eye"[tiab] OR "Dry Eye Syndromes"[MeSH] OR ...) AND ("night driving"[tiab] OR "Automobile Driving"[MeSH] OR ...) AND ("driver"[tiab] OR ...)) |
 | Fields Searched | Title/Abstract/MeSH |
-| Filters/Limits Applied | English, Malay — NO date limits (PC-04); NO language/Human filters applied at search (P-05); language enforced at screening via E9 |
+| Filters/Limits Applied | None — NO date limits (PC-04); NO language/Human filters applied at search (P-05); language (English + Malay) enforced at screening via E9 |
 | Date Range (Applied Limits) | None — MEDLINE 1946–present, searched 2026-09-03 |
-| Language Limits | English, Malay |
+| Language Limits | None at search — English + Malay enforced at screening (E9) |
 
 ## Results
 

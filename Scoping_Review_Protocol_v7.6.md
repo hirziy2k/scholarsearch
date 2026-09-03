@@ -92,6 +92,8 @@ A scoping review is the most appropriate methodology because:
 4. No existing review addresses this specific intersection
 5. The Arksey and O'Malley (2005) framework, refined by Levac et al. (2010), and reported per PRISMA-ScR (Tricco et al. 2018), provides a rigorous, transparent, and repeatable methodology
 
+**Stakeholder consultation (P-05):** Levac et al. Stage 6 consultation is optional per current JBI guidance and is not undertaken for this student-timeline review; reported as such in the final manuscript.
+
 ---
 
 ### 4. Objectives
@@ -328,6 +330,8 @@ Formal pre-execution checkpoint (Days 1–5, before OSF-gated search start): ver
 | MyTO (Malaysian Thesis Online) | Malaysian thesis portal (via UPM) | Free | Malaysian theses across all disciplines |
 | Author contact | Unpublished manuscripts | Direct |
 
+**Grey-literature execution tiers (P-02, execution order only — eligibility unchanged):** Must-execute: ProQuest Dissertations & Theses Global, OpenDOAR, OSF Preprints, medRxiv, WHO IRIS, NHTSA, MyJurnal/MyCite, e-Rep, ptsldigital, MyTO, NMRR, PROSPERO, Epistemonikos, author contact. Execute-if-time: bioRxiv, SSRN, Transport for NSW, conference abstracts (ARVO/BCLA/AAOS). Tiering governs execution order on a student timeline only; all listed sources remain eligible, and any unexecuted source is logged as not-searched with reason per §10.1.1.
+
 #### 10.3 Other Sources
 
 - Backward citation searching: hand-search reference lists of all included studies and all relevant systematic/scoping reviews identified via Epistemonikos and Cochrane Library. Prior to freezing S1 v1.2, mine published strategies from relevant Epistemonikos/CDSR reviews on DED and driving to extract/adapt controlled and free-text terms (PC-20).
@@ -513,6 +517,8 @@ VisionCite adaptation consolidated to Supplement S1 v1.2 §8 (sole executable: s
 - Discrepancies resolved by discussion; charting form clarified if needed; unresolved charting disputes → arbiter; log form clarifications (PCR-02)
 
 #### 13.2 Data Charting Form
+
+**Charting tiers (P-03 — all fields remain available; tiers govern reviewer effort):** Must-chart: Study identification, Publication type/status, Study design/setting, Population (N enrolled/analysed, age, gender), DED assessment type + instrument, Night-driving assessment type + instrument, Main association + effect size + direction, Companion-report tracking, DOI. Optional (chart only if reported, else N/A): driving experience/frequency, vehicle type, instrument validation metrics, clinical DED measures, simulator/on-road protocol detail, intermediate visual methods, qualitative themes, DED severity distribution, covariates.
 
 | Field | Type | Definition / Options |
 |---|---|---|
@@ -873,6 +879,13 @@ Any amendments to this protocol will be documented, justified, and registered as
 **Amendment record CR-01–CR-07 (2026-09-03, pre-registration benchmark audit):** documentation-only amendments — language justification (CR-01, §8.1/§20), PRESS re-review logging rule (CR-02, §11.4), charting spot-check 20%→30% (CR-03, §13.1), E6/E7 disambiguation (CR-06, §12.2), related-article cap rationale (CR-07, §10.3), S1 authority pointer (CR-05, §11.6–11.7). No eligibility, search-string, or synthesis change. Approved [initials — MUST-FILL]; registered as OSF versioned update pre-DOI.
 
 **Amendment record PCR-01–PCR-05 (2026-09-03, approved clarifiers):** doc-only — S1-only banners §§11.1–11.3/11.5–11.7 (PCR-01), charting arbiter line §13.1 (PCR-02), dedup locus §16.3 (PCR-03), Cochrane single-count footnote §10.1 (PCR-04), references header §23 (PCR-05). No eligibility, string, DB, or synthesis change. Backup: `backup_pre-PCR01-05_20260903_Scoping_Review_Protocol_v7.6.md`.
+
+**Amendment record P-01–P-05 (2026-09-03, approved pre-registration touch-ups):** doc-only — pre-OSF gate checklist (P-01, §21), grey execution tiers (P-02, §10.2), charting tiers (P-03, §13.2), Manual Appendix B language-filter alignment (P-04), consultation disclaimer (P-05, §3.6). No eligibility, search-string, DB, or synthesis change. Backup: `backup_pre-P01-05-audit_20260903/`. **ID note:** these audit touch-up IDs are distinct from pre-existing protocol control tags (P-01)=PRISMA-ScR checklist, (P-02)=PRISMA-S checklist, (P-03)=validation-metric logging, (P-05)=no language/Human filters at search, (P-08/P-09/P-12)=execution controls.
+
+**Pre-OSF gate P-01 (BLOCKING — no searches until all closed):**
+- [ ] CR-01–CR-07 + P-01–P-05 approval: initials + date (§21)
+- [ ] CR-02 second-reviewer verification: initials + date in manifest Strategy Version at execution (§11.5)
+- [ ] Reviewer 2 named in §19.1 CRediT (currently placeholder)
 
 ---
 
