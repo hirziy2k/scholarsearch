@@ -72,7 +72,29 @@ services/mendeley-patcher/output/
 .DS_Store
 Thumbs.db
 dump.rdb
-
-
-dump.rdb
 batch_demo_live.txt
+
+# Phase 1 backups (sqlite baks ignored)
+.opencode/session-state.json.bak
+.opencode/slide_state.sqlite.bak
+.opencode/swarm/swarm_state.sqlite.bak
+
+# Session tracker working copy (canonical is .opencode/session-state.json)
+.opencode/skills/session-state.json
+
+# Mendeley patcher binary (build via build.bat, not committed)
+services/mendeley-patcher/deploy/*.exe
+services/mendeley-patcher/deploy/*.dll
+
+# OSF / audit backup directories (canonical is archive_superseded_20260903)
+backup_pre-*/
+archive_superseded_*/
+backup_pre-*/
+
+# OSF package PDFs and consolidated audits (generated, not sourced)
+Scoping_Review_Final_Package_*.pdf
+Scoping_Review_Source_Audit_*.md
+WINDOWS_OLD_AUDIT_PROTOCOL.md
+
+# Redis Path 2 working copy (canonical ledger is .opencode/session-state.json)
+.opencode/swarm/redis6380.env.bak

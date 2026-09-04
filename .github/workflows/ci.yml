@@ -5,10 +5,14 @@ on:
     branches: [main]
     paths:
       - 'services/pdf-engine/**'
+      - '.opencode/swarm/**'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
     paths:
       - 'services/pdf-engine/**'
+      - '.opencode/swarm/**'
+      - '.github/workflows/ci.yml'
 
 jobs:
   test:
@@ -86,3 +90,51 @@ jobs:
           name: test-reports
           path: services/pdf-engine/test_results/*.html
           retention-days: 30
+
+  swarm-tests:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install redis hiredis
+
+      - name: Verify Redis streams (XADD/XLEN)
+        run: |
+          redis-cli -p 6379 ping
+          redis-cli -p 6379 XADD test_stream * field value
+          redis-cli -p 6379 XLEN test_stream
+          redis-cli -p 6379 DEL test_stream
+          echo "Streams validated on redis:7-alpine"
+
+      - name: Run Swarm core tests
+        run: python -m pytest .opencode/swarm/test_swarm.py -v
+
+      - name: Run Swarm streams tests
+        run: python -m pytest .opencode/swarm/test_streams.py -v
+
+      - name: Run Swarm mechanic tests
+        run: python -m pytest .opencode/swarm/test_mechanic.py -v
+
+      - name: Run Swarm chaos tests
+        run: python -m pytest .opencode/swarm/test_chaos.py -v
+
+      - name: Run Swarm Day2 tests
+        run: python -m pytest .opencode/swarm/test_day2.py -v
+        continue-on-error: true  # Day2 operational tests may require full env
+
+      - name: Run Swarm genesis tests
+        run: python -m pytest .opencode/swarm/test_genesis.py -v

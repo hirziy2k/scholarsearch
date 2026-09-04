@@ -196,7 +196,7 @@ To map the available evidence on the relationship between DED/dry-eye symptoms a
 
 **Concept — DED/Dry-Eye:**
 - Dry Eye Disease (DED) — any diagnostic criteria (TFOS DEWS II, TFOS DEWS III, ADES, clinical diagnosis, or study-specific definition)
-- Dry-eye symptoms — measured by any validated or custom questionnaire (OSDI, SPEED, DEQ, CLDEQ, IDEEL, NEI-VFQ, VND-Q, or custom instruments)
+- Dry-eye symptoms — measured by any validated or custom questionnaire (OSDI, SPEED, DEQ, CLDEQ, IDEEL, NEI-VFQ, or custom instruments) [C-02 audit fix 2026-09-03: VND-Q removed here — VND-Q/VND-Q-M are night-driving instruments, retained in Night-Driving list below and in S1 C2 block]
 - Subclinical dry-eye symptoms
 - Tear film instability as a proxy for DED (TBUT, NIBUT, tear film osmolarity)
 - Visual function measures in the context of DED and driving: contrast sensitivity, HOAs, glare sensitivity, mesopic visual acuity, scotopic visual acuity
@@ -550,7 +550,7 @@ VisionCite adaptation consolidated to Supplement S1 v1.2 §8 (sole executable: s
 | DED definition used | Categorical | TFOS DEWS II, TFOS DEWS III, ADES, Clinical diagnosis, Symptom-based, Not stated |
 | DED diagnostic criteria | Text | Specific criteria applied (if reported) |
 | DED assessment type | Categorical | Questionnaire only, Clinical tests only, Combined, Not stated |
-| Dry-eye symptom instrument | Text | OSDI, SPEED, DEQ, CLDEQ, IDEEL, VND-Q, NEI-VFQ, Custom (specify), Other (specify) |
+| Dry-eye symptom instrument | Text | OSDI, SPEED, DEQ, CLDEQ, IDEEL, NEI-VFQ, Custom (specify), Other (specify) [C-02: VND-Q removed — chart as night-driving instrument below] |
 | Dry-eye symptom instrument validated? | Categorical | Yes (cite validation study + log numeric metrics where reported, e.g., CVI/α) (P-03), No, Not stated |
 | Clinical DED measures | Text | TBUT, NIBUT, Schirmer, Osmolarity, Corneal staining, Meibography, Other (specify) |
 | DED severity distribution | Text | Mild/moderate/severe breakdown (if reported) |
@@ -881,6 +881,8 @@ Any amendments to this protocol will be documented, justified, and registered as
 **Amendment record PCR-01–PCR-05 (2026-09-03, approved clarifiers):** doc-only — S1-only banners §§11.1–11.3/11.5–11.7 (PCR-01), charting arbiter line §13.1 (PCR-02), dedup locus §16.3 (PCR-03), Cochrane single-count footnote §10.1 (PCR-04), references header §23 (PCR-05). No eligibility, string, DB, or synthesis change. Backup: `backup_pre-PCR01-05_20260903_Scoping_Review_Protocol_v7.6.md`.
 
 **Amendment record P-01–P-05 (2026-09-03, approved pre-registration touch-ups):** doc-only — pre-OSF gate checklist (P-01, §21), grey execution tiers (P-02, §10.2), charting tiers (P-03, §13.2), Manual Appendix B language-filter alignment (P-04), consultation disclaimer (P-05, §3.6). No eligibility, search-string, DB, or synthesis change. Backup: `backup_pre-P01-05-audit_20260903/`. **ID note:** these audit touch-up IDs are distinct from pre-existing protocol control tags (P-01)=PRISMA-ScR checklist, (P-02)=PRISMA-S checklist, (P-03)=validation-metric logging, (P-05)=no language/Human filters at search, (P-08/P-09/P-12)=execution controls.
+
+**Amendment record C-02 + C-01/C-04/C-05/C-13 (2026-09-03, cross-document audit Items A/B — approved):** doc/metadata-only, no scope change — (1) C-02 VND-Q precision fix: removed VND-Q from dry-eye enumerations in §8.2 and §13.2 (VND-Q/VND-Q-M remain night-driving instruments in §8.2-night, §13.2-night, and S1 C2 block; eligibility gates and S1 logic unchanged); (2) benchmark TABLE_FULL v1.1→v1.2 metadata pass: Martin year standardised to 2023, residual verify-cells retained as honest pending flags for pre-OSF DOI/OSF click-checks (no exemplar redesign); (3) C-13 re-save log: protocol re-saved 2026-09-03 ~21:41 and benchmark ~21:46 after consolidated source-audit hashes (17:05) for A1-A4/C-02 touch-ups only — no eligibility, string, DB, screening, charting-domain, or synthesis change; (4) bibliography hygiene (15 deletions, NICE→CKS, MOH→NES III+Salowi, Rethlefsen/DOI pass) staged as approved parallel track per `Scoping_Review_Source_Audit_CONSOLIDATED_2026-09-03.md` §§8/10, to be finalised locally pre-OSF with its own version note. Backups: `archive_superseded_20260903/`, `backup_pre-*/` retained; no files renamed.
 
 **Pre-OSF gate P-01 (BLOCKING — no searches until all closed):**
 - [ ] CR-01–CR-07 + P-01–P-05 approval: initials + date (§21)

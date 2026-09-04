@@ -11,18 +11,24 @@ A headless, self-healing state machine that bridges PDF ingestion, scenario comp
 
 ## Runtime
 
-| Component | Port | Purpose |
-|-----------|------|---------|
-| OmniRoute | 20128 | LLM fleet (oc/hy3-free primary) |
-| HITL | 8081 | Human-in-the-loop command center |
-| Export API | 8082 | Distributed HITL REST API |
-| Orchestrator | 8083 | Unified Intelligence Engine |
+| Component | Port | Purpose | Status |
+|-----------|------|---------|--------|
+| OmniRoute | 20128 | LLM fleet (oc/hy3-free primary) | Active |
+| HITL | 8081 | Human-in-the-loop command center | Active |
+| Export API | 8082 | Distributed HITL REST API | Active |
+| Orchestrator | 8083 | Unified Intelligence Engine (`orchestrate.py`, legacy primary) | Active |
+| Swarm API | 8084 | Swarm Cascade deep research (`swarm/api_server.py`, CURRENT PRODUCTION) | Active — ThreadingHTTPServer, live OpenAlex triangulation |
+| Redis (prod) | 6379 | Redis 3.0.504 service (admin-owned) | Active — DEGRADED (no XADD/XLEN streams) |
+| Redis (Path 2) | 6380 | Intended Redis 7+ (user-space, `swarm/redis6380.env`) | Down — requires admin (Memurai 1603) or Docker; CI uses `redis:7-alpine` |
 
 ## Core Files
 
 | File | Purpose |
 |------|---------|
-| `orchestrate.py` | Main server — all endpoints, pipeline thread, SSE/callback egress |
+| `orchestrate.py` | Main server — all endpoints, pipeline thread, SSE/callback egress (port 8083) |
+| `swarm/api_server.py` | **CURRENT PRODUCTION** — Swarm Cascade HTTP API (port 8084), `get_model_client()` + live OpenAlex, delegates to `swarm/orchestrator.py` library |
+| `swarm/orchestrator.py` | Swarm library (pipeline coordination, used by `api_server.py`) |
+| `swarm/redis6380.env` | Redis Path 2 config — documents degraded 3.0.504 vs intended 7+ |
 | `slide_state.py` | Multi-table SQLite schema with WAL mode, ABAC domains |
 | `parallel_dispatch.py` | ThreadPoolExecutor dispatcher + NER + compound citations |
 | `vector_store.py` | NumPy cosine similarity + ABAC domain filtering |
