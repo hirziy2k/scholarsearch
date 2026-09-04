@@ -2,13 +2,13 @@ name: PDF-to-PPTX CI Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
     paths:
       - 'services/pdf-engine/**'
       - '.opencode/swarm/**'
       - '.github/workflows/ci.yml'
   pull_request:
-    branches: [main]
+    branches: [master, main]
     paths:
       - 'services/pdf-engine/**'
       - '.opencode/swarm/**'

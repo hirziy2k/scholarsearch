@@ -5,11 +5,11 @@ on:
     - cron: "0 9 * * 1"
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [master, main]
     paths:
       - 'services/pdf-engine/requirements*.txt'
   pull_request:
-    branches: [main]
+    branches: [master, main]
     paths:
       - 'services/pdf-engine/requirements*.txt'
 
