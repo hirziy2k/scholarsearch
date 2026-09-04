@@ -63,12 +63,27 @@ jobs:
         run: |
           python -c "
           import json, sys
-          with open('test_results/results.json') as f:
-              data = json.load(f)
-          total = len(data.get('results', []))
-          passed = sum(1 for r in data.get('results', []) if r.get('success'))
+          from pathlib import Path
+          p = Path('test_results/results.json')
+          data = json.loads(p.read_text())
+          # results.json may be list or dict with 'results' key
+          if isinstance(data, list):
+              results = data
+          elif isinstance(data, dict):
+              results = data.get('results', [])
+              # handle nested dict like {'results': [...]} or {'results': {'items': [...]}} 
+              if isinstance(results, dict):
+                  results = results.get('items', []) or list(results.values())
+          else:
+              results = []
+          total = len(results)
+          passed = sum(1 for r in results if isinstance(r, dict) and r.get('success'))
           score = passed / total * 100 if total > 0 else 0
-          print(f'Score: {score:.1f}%')
+          print(f'Score: {score:.1f}% ({passed}/{total})')
+          # Debug first failure
+          if total>0 and passed<total:
+              fails=[r for r in results if isinstance(r, dict) and not r.get('success')][:3]
+              print('Sample fails:', fails)
           if score < 99.7:
               print(f'FAIL: Score {score:.1f}% is below 99.7% threshold')
               sys.exit(1)
