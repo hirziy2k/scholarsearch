@@ -112,6 +112,9 @@ jobs:
           pip install --upgrade pip
           pip install redis hiredis
 
+      - name: Install Redis CLI
+        run: sudo apt-get update && sudo apt-get install -y redis-tools
+
       - name: Verify Redis streams (XADD/XLEN)
         run: |
           redis-cli -p 6379 ping
