@@ -47,11 +47,16 @@ export function checkPredatory(paper: any): QuarantineResult {
     negativeMultiplier: 0,
   };
 
-  // Extract paper metadata
-  const doi = (paper.DOI ?? paper.doi ?? "").toLowerCase();
-  const issn = (paper.ISSN ?? paper.issn ?? "").replace(/-/g, "").toLowerCase();
-  const publisher = (paper.publisher ?? paper.publisherName ?? "").toLowerCase();
-  const journal = (paper.containerTitle ?? paper.journal ?? paper.source ?? "").toLowerCase();
+  // Extract paper metadata — handle ISSN array (Crossref), DOI/ISSN as string|array
+  const rawDoi = paper.DOI ?? paper.doi ?? paper.externalIds?.DOI ?? "";
+  const doi = (Array.isArray(rawDoi) ? rawDoi[0] ?? "" : rawDoi).toString().toLowerCase();
+  const rawIssn = paper.ISSN ?? paper.issn ?? "";
+  const issnStr = Array.isArray(rawIssn) ? rawIssn[0] ?? "" : rawIssn;
+  const issn = issnStr.toString().replace(/-/g, "").toLowerCase();
+  const rawPublisher = paper.publisher ?? paper.publisherName ?? "";
+  const publisher = (Array.isArray(rawPublisher) ? rawPublisher[0] ?? "" : rawPublisher).toString().toLowerCase();
+  const rawJournal = paper.containerTitle ?? paper.journal ?? paper.source ?? "";
+  const journal = (Array.isArray(rawJournal) ? rawJournal[0] ?? "" : rawJournal).toString().toLowerCase();
   const domain = extractDomain(doi);
 
   // Check domain against predatory domains
