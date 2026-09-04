@@ -20,13 +20,38 @@
       "path": ".github/workflows/ci.yml",
       "last_edit": "2026-09-04T10:03:21.287135+00:00",
       "change_description": "Added swarm-tests job: triggers on swarm/**, redis:7-alpine, 6 pytest suites"
+    },
+    {
+      "path": ".opencode/swarm/api_server.py",
+      "last_edit": "2026-09-04T10:29:45.603958+00:00",
+      "change_description": "Added decoupled DLQ stats endpoint /api/dlq/stats with ephemeral SQLite"
+    },
+    {
+      "path": ".opencode/swarm/dashboard.html",
+      "last_edit": "2026-09-04T10:29:45.712996+00:00",
+      "change_description": "Added DLQ card with 3s timeout decoupled polling"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/services/search-orchestrator.ts",
+      "last_edit": "2026-09-04T10:29:45.818062+00:00",
+      "change_description": "Integrated server-side predatory filter with stdout logging"
+    },
+    {
+      "path": "services/scholarsearch/packages/mcp-sources/src/mcp-server.ts",
+      "last_edit": "2026-09-04T10:29:45.934458+00:00",
+      "change_description": "Wrapped mcp-sources as stdio MCP with 2 tools"
+    },
+    {
+      "path": "opencode.json",
+      "last_edit": "2026-09-04T10:29:46.068367+00:00",
+      "change_description": "Exposed scholarsearch-sources MCP via node dist/mcp-server.js"
     }
   ],
   "active_blockers": [],
   "next_action_trigger": null,
   "meta": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-09-04T10:03:21.287135+00:00",
+    "last_updated": "2026-09-04T10:29:46.068367+00:00",
     "session_count": 0,
     "total_tokens_saved": 0
   }

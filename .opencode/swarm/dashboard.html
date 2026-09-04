@@ -372,6 +372,30 @@
             </div>
         </div>
 
+        <div class="grid">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Dead Letter Queue</span>
+                    <span class="card-value" id="dlqCount" style="font-size:16px;color:var(--accent-yellow)">—</span>
+                </div>
+                <div class="chips" id="dlqChips">
+                    <span class="chip chip-blue">POLLING...</span>
+                </div>
+                <div id="dlqRecent" style="margin-top:12px;font-size:11px;color:var(--text-secondary);max-height:80px;overflow-y:auto"></div>
+                <div style="margin-top:8px;font-size:10px;color:var(--text-secondary)" id="dlqUnacked"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Streams Health</span>
+                </div>
+                <div class="chips" id="streamsChips">
+                    <span class="chip chip-purple">XADD/XLEN: PENDING</span>
+                </div>
+                <div style="margin-top:8px;font-size:10px;color:var(--text-secondary)" id="streamsNote">Local 3.0.504 degraded — CI 7-alpine validates</div>
+            </div>
+        </div>
+
         <div class="card full-width">
             <div class="card-header">
                 <span class="card-title">Query History</span>
@@ -612,9 +636,71 @@
             statusText.textContent = 'Connected';
         }
 
+        // #7 DLQ metric — decoupled, non-blocking, 3s timeout, never blocks main pipeline
+        let dlqInterval = null;
+        async function fetchDLQStats() {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 3000);
+            try {
+                const res = await fetch(`${API_BASE}/api/dlq/stats`, { signal: controller.signal, cache: 'no-store' });
+                clearTimeout(timeout);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const countEl = document.getElementById('dlqCount');
+                const chipsEl = document.getElementById('dlqChips');
+                const recentEl = document.getElementById('dlqRecent');
+                const unackedEl = document.getElementById('dlqUnacked');
+                if (data.error) {
+                    countEl.textContent = 'ERR';
+                    chipsEl.innerHTML = `<span class="chip chip-red">DLQ ERR</span>`;
+                    recentEl.textContent = data.error;
+                    return;
+                }
+                countEl.textContent = data.dlq_count;
+                countEl.style.color = data.dlq_count > 0 ? 'var(--accent-red)' : 'var(--accent-green)';
+                if (data.dlq_count === 0) {
+                    chipsEl.innerHTML = `<span class="chip chip-green">DLQ EMPTY</span>`;
+                    recentEl.textContent = 'No dead letters — pipeline clean';
+                } else {
+                    chipsEl.innerHTML = `<span class="chip chip-red">${data.dlq_count} DEAD LETTERS</span>`;
+                    recentEl.innerHTML = data.recent.map(r => {
+                        const t = new Date(r.created_at * 1000).toLocaleTimeString();
+                        return `<div style="padding:4px 0;border-bottom:1px solid var(--border)">${t} — ${r.error_reason.substring(0,80)} <span style="color:var(--accent-yellow)">retry ${r.retry_count}</span></div>`;
+                    }).join('');
+                }
+                if (data.unacked_depth !== null && data.unacked_depth !== undefined) {
+                    unackedEl.textContent = `Unacked queue: ${data.unacked_depth}`;
+                } else {
+                    unackedEl.textContent = `Unacked: n/a (Redis unavailable)`;
+                }
+                // Streams health hint
+                const sEl = document.getElementById('streamsChips');
+                if (data.unacked_depth !== null) {
+                    sEl.innerHTML = `<span class="chip chip-green">REDIS OK</span>`;
+                }
+            } catch (e) {
+                clearTimeout(timeout);
+                // Non-blocking: show timeout but never block main UI
+                const countEl = document.getElementById('dlqCount');
+                const chipsEl = document.getElementById('dlqChips');
+                if (e.name === 'AbortError') {
+                    chipsEl.innerHTML = `<span class="chip chip-yellow">DLQ TIMEOUT (3s)</span>`;
+                } else {
+                    chipsEl.innerHTML = `<span class="chip chip-red">DLQ UNREACHABLE</span>`;
+                }
+                console.warn('[DLQ] fetch failed (decoupled, non-blocking):', e.message);
+            }
+        }
+        function startDLQPolling() {
+            fetchDLQStats(); // immediate
+            if (dlqInterval) clearInterval(dlqInterval);
+            dlqInterval = setInterval(fetchDLQStats, 5000); // decoupled 5s poll, independent of query submit
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             initCharts();
             initSSE();
+            startDLQPolling();
             
             document.getElementById('queryInput').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') submitQuery();

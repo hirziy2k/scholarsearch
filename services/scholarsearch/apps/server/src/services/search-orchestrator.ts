@@ -28,6 +28,8 @@ import {
   generateQueryVersionHash,
   DEFAULT_WEIGHTS,
   analyzeResearchGaps,
+  checkPredatory,
+  type QuarantineResult,
   type QueryVersionHash,
   type DegradedModeAlert,
   type ShadowMergeFlag,
@@ -118,6 +120,15 @@ interface DedupEntry {
   firstAuthor: string;
 }
 
+export interface PredatoryFilterLog {
+  title: string;
+  doi?: string;
+  publisher?: string;
+  matchedField: string | null;
+  confidence: number;
+  source: string;
+}
+
 interface DedupResult {
   unique: SearchResult[];
   duplicatesRemoved: number;
@@ -125,6 +136,8 @@ interface DedupResult {
   entityBlockedCount: number;
   totalBefore: number;
   totalAfter: number;
+  predatoryFiltered: number;
+  predatoryLog: PredatoryFilterLog[];
 }
 
 function deduplicateResults(results: SearchResult[]): DedupResult {
@@ -133,11 +146,39 @@ function deduplicateResults(results: SearchResult[]): DedupResult {
   const uniqueResults: SearchResult[] = [];
   const shadowMergeFlags: ShadowMergeFlag[] = [];
   let entityBlockedCount = 0;
+  let predatoryFiltered = 0;
+  const predatoryLog: PredatoryFilterLog[] = [];
 
   for (const result of results) {
     const uniqueRaw: Record<string, any>[] = [];
 
     for (const paper of result.raw_results) {
+      // --- Server-side predatory filter (deterministic, bloom-based) ---
+      // Log to stdout + temp array so filter aggressiveness is visible; never fail silently.
+      try {
+        const quarantine: QuarantineResult = checkPredatory(paper);
+        if (quarantine.isPredatory) {
+          predatoryFiltered++;
+          const entry: PredatoryFilterLog = {
+            title: String(paper.title ?? paper.Title ?? "").substring(0, 80),
+            doi: paper.DOI ?? paper.doi ?? paper.externalIds?.DOI ?? undefined,
+            publisher: paper.publisher ?? paper.publisherName ?? undefined,
+            matchedField: quarantine.matchedField,
+            confidence: quarantine.confidence,
+            source: result.source,
+          };
+          predatoryLog.push(entry);
+          // Log to stdout for operator visibility; keep raw paper out of response
+          console.warn(
+            `[predatory-filter] filtered title="${entry.title}" doi=${entry.doi ?? "n/a"} publisher=${entry.publisher ?? "n/a"} field=${entry.matchedField} conf=${entry.confidence} source=${entry.source}`
+          );
+          continue;
+        }
+      } catch (e) {
+        // Check failure should never block results — log and continue to dedup
+        console.warn(`[predatory-filter] check failed for paper ${paper.doi ?? paper.DOI ?? "unknown"}:`, e);
+      }
+
       // --- Extract fields with full format handling ---
       const doi = paper.DOI ?? paper.doi ?? paper.externalIds?.DOI;
 
@@ -245,6 +286,8 @@ function deduplicateResults(results: SearchResult[]): DedupResult {
     entityBlockedCount,
     totalBefore,
     totalAfter,
+    predatoryFiltered,
+    predatoryLog,
   };
 }
 
@@ -267,6 +310,8 @@ export interface SearchOrchestratorResult {
   duplicatesRemoved: number;
   entityBlockedCount: number;
   shadowMergeFlags: ShadowMergeFlag[];
+  predatoryFiltered: number;
+  predatoryLog: PredatoryFilterLog[];
   degradedSources: string[];
   alerts: DegradedModeAlert[];
   frozenWeights: RankingWeights;
@@ -613,8 +658,11 @@ export async function orchestrateSearch(
     }
   }
 
-  // --- Step 5: Deduplication with Shadow Merge + Entity-Aware Blocking ---
-  const { unique, duplicatesRemoved, shadowMergeFlags, entityBlockedCount } = deduplicateResults(results);
+  // --- Step 5: Deduplication with Shadow Merge + Entity-Aware Blocking + Predatory Quarantine ---
+  const { unique, duplicatesRemoved, shadowMergeFlags, entityBlockedCount, predatoryFiltered, predatoryLog } = deduplicateResults(results);
+  if (predatoryFiltered > 0) {
+    console.warn(`[predatory-filter] server-side filtered ${predatoryFiltered} predatory papers (see predatoryLog)`);
+  }
 
   // --- Step 5.5: Grey Literature & Peer-Review Tier Classification ---
   //
@@ -712,6 +760,8 @@ export async function orchestrateSearch(
     duplicatesRemoved,
     entityBlockedCount,
     shadowMergeFlags,
+    predatoryFiltered,
+    predatoryLog,
     degradedSources,
     alerts,
     frozenWeights: frozenSnapshot.weights as RankingWeights,

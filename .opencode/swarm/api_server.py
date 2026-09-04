@@ -94,6 +94,8 @@ class SwarmAPIHandler(BaseHTTPRequestHandler):
 
         if path == "/api/health":
             self.send_health()
+        elif path in ("/api/dlq", "/api/dlq/stats", "/api/mechanic/dlq"):
+            self.send_dlq_stats()
         elif path.startswith("/api/stream/"):
             query_hash = path.split("/")[-1]
             self.send_stream(query_hash)
@@ -127,6 +129,67 @@ class SwarmAPIHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(json.dumps(response, indent=2).encode())
+
+    def send_dlq_stats(self):
+        """Decoupled DLQ metric — ephemeral SQLite per-request, never blocks pipeline or shares thread."""
+        conn = None
+        try:
+            # Always open ephemeral connection — ThreadingHTTPServer reuses shared db across threads which fails (SQLite thread affinity).
+            # Ephemeral connection is decoupled, 2s timeout, read-only fast path.
+            conn = sqlite3.connect(DB_PATH, timeout=2.0, check_same_thread=False)
+            cursor = conn.cursor()
+
+            # Fast count query
+            cursor.execute("SELECT COUNT(*) FROM mechanic_dlq")
+            row = cursor.fetchone()
+            dlq_count = row[0] if row else 0
+
+            # Recent 5 items for dashboard preview (non-blocking, limit 5)
+            cursor.execute("""
+                SELECT id, error_reason, created_at, retry_count
+                FROM mechanic_dlq
+                ORDER BY created_at DESC
+                LIMIT 5
+            """)
+            recent = [
+                {"id": r[0], "error_reason": r[1], "created_at": r[2], "retry_count": r[3]}
+                for r in cursor.fetchall()
+            ]
+
+            # Also report unacked queue depth if Redis available (best-effort, 500ms timeout)
+            unacked_depth = None
+            try:
+                r = redis.from_url(REDIS_URL, socket_timeout=0.5)
+                unacked_depth = r.llen(UNACKED_WRITES)
+            except Exception:
+                unacked_depth = None
+
+            conn.close()
+            conn = None
+
+            response = {
+                "dlq_count": dlq_count,
+                "unacked_depth": unacked_depth,
+                "recent": recent,
+                "timestamp": time.time(),
+            }
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
+        except Exception as e:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({"dlq_count": None, "error": str(e), "timestamp": time.time()}).encode())
 
     def handle_research(self, body):
         """Handle research query submission."""

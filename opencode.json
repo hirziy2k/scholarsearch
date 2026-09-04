@@ -16,6 +16,10 @@
     "powerpoint": {
       "type": "local",
       "command": ["uvx", "--with", "mcp<2", "powerpoint-mcp"]
+    },
+    "scholarsearch-sources": {
+      "type": "local",
+      "command": ["node", "services/scholarsearch/packages/mcp-sources/dist/mcp-server.js"]
     }
   }
 }
