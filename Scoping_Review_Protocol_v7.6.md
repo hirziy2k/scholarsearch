@@ -847,8 +847,8 @@ Because the lead reviewer is also an author of the thesis, the draft manuscript,
 #### 19.1 Contributor Roles Taxonomy (CRediT) Statement
 
 - **Wan Muhammad Hirzi Wan Din (Lead Reviewer):** Conceptualization, Methodology, Data Curation (Primary Search & Extraction), Formal Analysis, Writing – Original Draft, Project Administration.
-- **[Reviewer 2 Name]:** Methodology, Validation (PRESS execution), Data Curation (Independent Screening & Calibration), Writing – Review & Editing.
-- **[Senior Author / Supervisor]:** Supervision, Conceptualization, Methodology, Writing – Review & Editing.
+- **Pui Juan Woi (Second Reviewer):** Methodology, Validation (PRESS execution), Data Curation (Independent Screening & Calibration), Writing – Review & Editing.
+- **Pui Juan Woi (Senior Author / Supervisor):** Supervision, Conceptualization, Methodology, Writing – Review & Editing.
 - *(Note: All deterministic Python automation and exact-match deduplication executed by the Lead Reviewer, validated by Reviewer 2).*
 
 #### 19.2 Funding Disclosure
@@ -886,7 +886,7 @@ The Lead Reviewer is the author of the thesis (Wan Din 2026), co-author of Woi e
 
 Any amendments to this protocol will be documented, justified, and registered as protocol updates on OSF. Major changes (e.g., eligibility criteria, search strategy) will be reported in the final manuscript.
 
-**Amendment record CR-01–CR-07 (2026-09-03, pre-registration benchmark audit):** documentation-only amendments — language justification (CR-01, §8.1/§20), PRESS re-review logging rule (CR-02, §11.4), charting spot-check 20%→30% (CR-03, §13.1), E6/E7 disambiguation (CR-06, §12.2), related-article cap rationale (CR-07, §10.3), S1 authority pointer (CR-05, §11.6–11.7). No eligibility, search-string, or synthesis change. Approved [initials — MUST-FILL]; registered as OSF versioned update pre-DOI.
+**Amendment record CR-01–CR-07 (2026-09-03, pre-registration benchmark audit):** documentation-only amendments — language justification (CR-01, §8.1/§20), PRESS re-review logging rule (CR-02, §11.4), charting spot-check 20%→30% (CR-03, §13.1), E6/E7 disambiguation (CR-06, §12.2), related-article cap rationale (CR-07, §10.3), S1 authority pointer (CR-05, §11.6–11.7). No eligibility, search-string, or synthesis change. Approved WPJ; registered as OSF versioned update pre-DOI.
 
 **Amendment record PCR-01–PCR-05 (2026-09-03, approved clarifiers):** doc-only — S1-only banners §§11.1–11.3/11.5–11.7 (PCR-01), charting arbiter line §13.1 (PCR-02), dedup locus §16.3 (PCR-03), Cochrane single-count footnote §10.1 (PCR-04), references header §23 (PCR-05). No eligibility, string, DB, or synthesis change. Backup: `backup_pre-PCR01-05_20260903_Scoping_Review_Protocol_v7.6.md`.
 
