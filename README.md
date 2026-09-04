@@ -20,11 +20,17 @@ A monorepo containing academic research tools orchestrated by an AI agent via Op
 │   │   └── scholarsearch-architecture/
 │   ├── engine/                # OmniRoute engine config
 │   │   └── model-aliases.json
-│   ├── orchestrate.py         # Unified Intelligence Engine
+│   ├── swarm/                 # Swarm Cascade deep research engine
+│   │   ├── api_server.py      # HTTP API (port 8084, CURRENT PRODUCTION)
+│   │   ├── orchestrator.py    # Swarm library
+│   │   └── dashboard.html     # Intelligence dashboard
+│   ├── orchestrate.py         # Unified Intelligence Engine (legacy)
+│   ├── CONFIG.md              # Complete configuration map
 │   └── session-state.json     # Cross-session state ledger
 ├── services/
 │   ├── pdf-engine/            # PDF-to-PPTX conversion (Python)
 │   ├── scholarsearch/         # Academic search engine (TypeScript)
+│   │   └── packages/mcp-sources/  # MCP stdio wrapper (8 academic sources)
 │   └── mendeley-patcher/      # Mendeley metadata correction (Python)
 └── .github/                   # CI/CD workflows
 ```
@@ -71,7 +77,7 @@ The OpenCode agent operates with:
 - **10 immutable rules** (context-discipline.md) enforcing token discipline
 - **Session state tracker** for cross-session memory (~120 tokens vs ~10,000 raw)
 - **5 specialized skills** for domain-specific tasks
-- **2 MCP servers** (pdf-tools, powerpoint) for tool access
+- **3 MCP servers** (pdf-tools, powerpoint, scholarsearch-sources) for tool access
 
 ## Configuration
 

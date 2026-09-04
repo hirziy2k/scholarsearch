@@ -7,24 +7,50 @@ on:
       - 'services/pdf-engine/**'
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/pdf2pptx
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     
     steps:
       - uses: actions/checkout@v4
       
-      - name: Build Docker image
-        run: docker build -t pdf2pptx:${{ github.sha }} -f services/pdf-engine/Dockerfile services/pdf-engine/
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: services/pdf-engine/
+          file: services/pdf-engine/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
       
       - name: Run container health check
         run: |
-          docker run -d --name test-api -p 8000:8000 pdf2pptx:${{ github.sha }}
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${GITHUB_SHA::7}}"
+          docker run -d --name test-api -p 8000:8000 "$IMAGE"
           sleep 10
           curl -f http://localhost:8000/v1/health || exit 1
           docker stop test-api
-      
-      - name: Tag for registry
-        run: |
-          docker tag pdf2pptx:${{ github.sha }} pdf2pptx:latest
-          docker tag pdf2pptx:${{ github.sha }} pdf2pptx:${{ github.ref_name }}

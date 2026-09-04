@@ -174,7 +174,7 @@ def main():
             for w in warnings:
                 print(f"  [WARN] {w}")
         if not errors and not warnings:
-            print("\n✓ State is fully compliant")
+            print("\nOK State is fully compliant")
 
         print(f"\nVerdict: {'PASS' if not errors else 'FAIL'}")
 

@@ -165,13 +165,13 @@ def cmd_validate():
     if errors:
         print("ERRORS:")
         for e in errors:
-            print(f"  ✗ {e}")
+            print(f"  X {e}")
     if warnings:
         print("WARNINGS:")
         for w in warnings:
-            print(f"  ⚠ {w}")
+            print(f"  ! {w}")
     if not errors and not warnings:
-        print("✓ State is valid")
+        print("OK State is valid")
 
     print(f"\nEstimated token cost: ~{tokens} tokens")
     print(f"Entries: {len(state.get('modified_infrastructure', []))} files, "
