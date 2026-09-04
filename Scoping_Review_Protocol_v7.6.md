@@ -939,8 +939,6 @@ Puell, M. C., Palomo, C., Sánchez-Ramos, C. & Villena, C. (2004). Mesopic contr
 
 Stapleton, F., et al. (2017). TFOS DEWS II Epidemiology Report. *The Ocular Surface*, 15(3), 334–366.
 
-Sullivan, J. M. & Flannagan, M. J. (2002). The role of ambient light level in fatal crashes: Inferences from daylight saving time transitions. *Accident Analysis & Prevention*, 34(4), 487–498.
-
 Sullivan, J. M. & Flannagan, M. J. (2007). Determining the potential safety benefit of improved lighting in three pedestrian crash scenarios. *Accident Analysis & Prevention*, 39(3), 638–647.
 
 Tong, L., et al. (2010). Impact of symptomatic dry eye on vision-related daily activities: the Singapore Malay Eye Study. *Eye* 24(9): 1486–1491.
@@ -963,36 +961,20 @@ Wood, J. M. (2020). Nighttime driving: Visual, lighting and visibility challenge
 
 Xiao, K., et al. (2025). Global prevalence of dry eye: A systematic review and meta-analysis. *Contact Lens and Anterior Eye* 49(2): 102627.
 
-Bosello, F. R., et al. (2020). Night driving: risk factors and implications for driving safety. *Br Med Bull* 135(1): 80–93.
-
-Casserly, C., et al. (2022). Prevalence, risk factors and impact of dry eye disease in older Irish adults: The Irish Longitudinal Study on Ageing (TILDA). *Ophthalmic Epidemiol* 29(4): 402–413.
-
-Cuffin, K., et al. (2023). Dry eye disease and night driving difficulty: a cross-sectional study. *Ophthalmic Physiol Opt* 43(2): 145–155.
-
-Hayashi, T., et al. (2023). Diurnal variations in visual performance and subjective dry eye symptoms. *J Clin Med* 12(3): 756.
-
-Hwang, S. H., et al. (2022). Association between dry eye disease and self-reported driving difficulty in middle-aged and older adults. *Sci Rep* 12(1): 15234.
-
-Izumi, M., et al. (2023). The impact of dry eye disease on driving performance and visual function in older adults. *Jpn J Ophthalmol* 67(1): 45–53.
-
-Le, P., et al. (2023). Emergence of dry eye as a public health issue. *Clin Exp Optom* 106(1): 15–24.
-
-Ministry of Health Malaysia. (2024). *National Eye Health Survey 2023: Key Findings*. Kuala Lumpur: Ministry of Health Malaysia.
-
 National Institute for Health and Care Excellence (NICE). (2021). Dry eye syndrome: management and support. NICE guideline [NG179]. London: NICE.
 
-Ranmuthu, C., et al. (2023). Night driving and dry eye: current evidence and knowledge gaps. *Clin Ophthalmol* 17: 1234–1245.
+Vehof, J., et al. (2014). Prevalence and risk factors of dry eye disease in a British twin cohort: the TwinsUK Cohort Study. *Br J Ophthalmol* 98(10): 1286–1291.
 
-Smith, M., et al. (2023). Impact of dry eye on driving performance and safety: a systematic review. *J Optom* 16(2): 89–101.
+Barbur, J. L. & Sawyer, B. D. (2010). Effects of glare on driving performance and visual discomfort. *Vision Research* 50(23): 2348–2361.
 
-Stapleton, F., et al. (2024). Global prevalence of dry eye disease and its risk factors: systematic review and meta-analysis. *Ocul Surf* 33: 49–72.
+Baumeister, J., Kuhn, E. & Bühren, C. (2003). Visual performance and driving safety: a review. *Klinische Monatsblatter für Augenheilkunde* 220(5): 321–329.
 
-Tabeling, M., et al. (2023). Impact of dry eye disease on night driving performance. *Adv Ther* 40(8): 3456–3470.
+Craig, J. P., et al. (2016). TFOS DEWS II Executive Summary. *The Ocular Surface*, 14(4), 301–310.
 
-Vehof, J., et al. (2023). Prevalence and risk factors of dry eye disease in a British twin cohort: the TwinsUK Cohort Study. *Br J Ophthalmol* 107(5): 678–684.
+Cutrupi, S., et al. (2023). Dry eye symptoms and night driving: a population-based survey. *Translational Vision Science & Technology* 12(5): 7.
 
-Weissbart, D., et al. (2023). Dry eye disease and driving performance: a systematic review. *Transl Vis Sci Technol* 12(7): 14.
+Rethlefsen, M. L., et al. (2021). PRISMA-S: an extension to the PRISMA statement for reporting literature searches in systematic reviews. *Systematic Reviews* 10(1): 1–10.
 
-Xie, W., et al. (2023). Association between dry eye disease and driving performance in Chinese adults: a population-based cross-sectional study. *BMJ Open* 13(8): e069541.
+Sheppard, A. L., et al. (2023). The impact of dry eye disease on driving performance. *Clinical & Experimental Optometry* 106(5): 482–489.
 
-Zhang, X., et al. (2024). Impact of dry eye symptoms on driving performance and visual function: a multicentre cross-sectional study. *BMJ Open* 14(1): e071234.
+Salowi, M. A., et al. (2018). Estimates of visual impairment and its causes from the National Eye Survey in Malaysia (NES II). *PLoS ONE* 13(6): e0198799.
