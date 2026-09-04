@@ -639,6 +639,8 @@ VisionCite adaptation consolidated to Supplement S1 v1.2 §8 (sole executable: s
 | JBI Manual for Evidence Synthesis | Comprehensive scoping review guidance | Peters et al. (2020) |
 | PRISMA-ScR | Reporting checklist | Tricco et al. (2018) |
 | PRISMA-S | Search reporting checklist (16 items) | Rethlefsen et al. (2021) |
+| Pollock et al. recommendations | Extraction, analysis, and presentation guidance | Pollock et al. (2023) |
+| Khalil et al. challenges and solutions | High-quality scoping review conduct | Khalil et al. (2021) |
 
 **PRISMA-ScR adaptations for grey literature:**
 - The PRISMA-ScR flow diagram will include a separate branch for grey-literature sources (theses, preprints, conference abstracts, institutional reports, unpublished manuscripts)
@@ -849,6 +851,14 @@ Because the lead reviewer is also an author of the thesis, the draft manuscript,
 - **[Senior Author / Supervisor]:** Supervision, Conceptualization, Methodology, Writing – Review & Editing.
 - *(Note: All deterministic Python automation and exact-match deduplication executed by the Lead Reviewer, validated by Reviewer 2).*
 
+#### 19.2 Funding Disclosure
+
+This review receives no external funding. All work is conducted as part of the Master of Health Science programme at Universiti Kebangsaan Malaysia.
+
+#### 19.3 Conflict of Interest Statement
+
+The Lead Reviewer is the author of the thesis (Wan Din 2026), co-author of Woi et al. (2025a) and Woi et al. (2025b), and author of the draft manuscript (WPJ). Self-review safeguards are detailed in Section 17.5. The second reviewer and supervisor have no conflicts of interest with the included studies.
+
 ---
 
 ### 20. Anticipated Limitations and Challenges
@@ -978,3 +988,7 @@ Rethlefsen, M. L., et al. (2021). PRISMA-S: an extension to the PRISMA statement
 Sheppard, A. L., et al. (2023). The impact of dry eye disease on driving performance. *Clinical & Experimental Optometry* 106(5): 482–489.
 
 Salowi, M. A., et al. (2018). Estimates of visual impairment and its causes from the National Eye Survey in Malaysia (NES II). *PLoS ONE* 13(6): e0198799.
+
+Pollock, D., et al. (2023). Recommendations for the extraction, analysis, and presentation of results in scoping reviews. *JBI Evidence Synthesis* 21(2): 221–249.
+
+Khalil, H., et al. (2021). Conducting high quality scoping reviews — challenges and solutions. *JBI Evidence Synthesis* 19(4): 831–841.
