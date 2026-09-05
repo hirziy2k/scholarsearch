@@ -153,7 +153,7 @@ scopus_2026-09-03_v1-batch2.manifest.md
 | Access Route | UKM PTSL → eResources@PTSL → RemoteXs → [Database] |
 | Protocol Version | 7.6 |
 | Search Strategy ID | [e.g., Section 11.4 Master + S1 v1.2 PubMed] |
-| Search Strategy Version | [e.g., S1 v1.2, PRESS date + initials] |
+| Search Strategy Version | [e.g., S1 v1.2, PRESS date + initials; Malay delta verification: reviewer initials + date] |
 | Model Assistance (P-09) | [pure-code / model-assisted: mistral:7b-instruct ID 6577803aa9a0 + prompt version; prompt file + per-batch diff retained in logs/] |
 | Review Stage (PC-15/PC-17) | [Primary search / Update search N] |
 
@@ -164,7 +164,7 @@ scopus_2026-09-03_v1-batch2.manifest.md
 | Search Date | [YYYY-MM-DD] |
 | Search Time | [HH:MM] |
 | Time Zone | [e.g., GMT+8] |
-| Executed By | [Name/initials] |
+| Executed By | [Name/initials — Lead Reviewer executes searches] |
 
 ## Search Parameters
 
@@ -517,7 +517,7 @@ scopus_2026-09-03_v1-batch1_merged.ris   (derived merged file — logged in mani
 | Search Date | 2026-09-03 |
 | Search Time | 14:30 |
 | Time Zone | GMT+8 |
-| Executed By | PJW |
+| Executed By | WMHWD |
 
 ## Search Parameters
 

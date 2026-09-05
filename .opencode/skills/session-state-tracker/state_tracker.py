@@ -19,7 +19,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-STATE_FILE = Path(__file__).parent.parent / "session-state.json"
+STATE_FILE = Path(__file__).parent.parent.parent / "session-state.json"
 
 SCHEMA = {
     "current_objective": (str, type(None)),

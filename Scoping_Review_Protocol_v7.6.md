@@ -897,7 +897,7 @@ Any amendments to this protocol will be documented, justified, and registered as
 **Pre-OSF gate P-01 (BLOCKING — no searches until all closed):**
 - [ ] CR-01–CR-07 + P-01–P-05 approval: initials + date (§21)
 - [ ] CR-02 second-reviewer verification: initials + date in manifest Strategy Version at execution (§11.5)
-- [ ] Reviewer 2 named in §19.1 CRediT (currently placeholder)
+- [ ] Reviewer 2 named in §19.1 CRediT
 
 ---
 
@@ -971,7 +971,7 @@ Wood, J. M. (2020). Nighttime driving: Visual, lighting and visibility challenge
 
 Xiao, K., et al. (2025). Global prevalence of dry eye: A systematic review and meta-analysis. *Contact Lens and Anterior Eye* 49(2): 102627.
 
-National Institute for Health and Care Excellence (NICE). (2021). Dry eye syndrome: management and support. NICE guideline [NG179]. London: NICE.
+National Institute for Health and Care Excellence (NICE). (2023). Dry eye disease. Clinical Knowledge Summary. London: NICE. Available from: https://cks.nice.org.uk/topics/dry-eye-disease/
 
 Vehof, J., et al. (2014). Prevalence and risk factors of dry eye disease in a British twin cohort: the TwinsUK Cohort Study. *Br J Ophthalmol* 98(10): 1286–1291.
 

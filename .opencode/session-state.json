@@ -1,58 +1,63 @@
 {
-  "current_objective": null,
+  "current_objective": "Audit complete; verification_log evicted to reports/; schema validator green; pending commit + push",
   "modified_infrastructure": [
     {
-      "path": ".opencode/CONFIG.md",
-      "last_edit": "2026-09-04T10:02:05.361895+00:00",
-      "change_description": "Documented Swarm api_server 8084 as CURRENT PRODUCTION, 6379 degraded, Path 2 6380 down"
+      "path": "Scoping_Review_Protocol_v7.6.md",
+      "last_edit": "2026-09-05T10:33:14.354456+00:00",
+      "change_description": "v7.7+v7.8 retracted, v7.6 current pre-DOI"
     },
     {
-      "path": ".opencode/skills/unified-engine-architecture/SKILL.md",
-      "last_edit": "2026-09-04T10:02:05.480406+00:00",
-      "change_description": "Updated Runtime table: Swarm API 8084 prod, Redis degraded note"
+      "path": "Scoping_Review_Source_Audit_CONSOLIDATED_2026-09-03.md",
+      "last_edit": "2026-09-05T10:33:14.419082+00:00",
+      "change_description": "P0 hygiene scope, HIGH-RISK verdict pending"
     },
     {
-      "path": ".gitignore",
-      "last_edit": "2026-09-04T10:02:58.614202+00:00",
-      "change_description": "Repository hygiene: gitignore exe+backups+PDFs, tracked redis6380.env, rm --cached exe"
+      "path": "scoping_review_benchmark_extraction_TABLE_FULL.md",
+      "last_edit": "2026-09-05T10:33:14.492130+00:00",
+      "change_description": "Tier exemplars with honest OSF pending flags"
     },
     {
-      "path": ".github/workflows/ci.yml",
-      "last_edit": "2026-09-04T10:03:21.287135+00:00",
-      "change_description": "Added swarm-tests job: triggers on swarm/**, redis:7-alpine, 6 pytest suites"
+      "path": "flowcharts/fig1_protocol_overview.png",
+      "last_edit": "2026-09-05T07:46:48.212010+00:00",
+      "change_description": "Protocol overview flowchart Fig1"
     },
     {
-      "path": ".opencode/swarm/api_server.py",
-      "last_edit": "2026-09-04T10:29:45.603958+00:00",
-      "change_description": "Added decoupled DLQ stats endpoint /api/dlq/stats with ephemeral SQLite"
+      "path": "flowcharts/fig2_prisma_scr_flow.png",
+      "last_edit": "2026-09-05T07:46:48.283000+00:00",
+      "change_description": "PRISMA-ScR selection template Fig2"
     },
     {
-      "path": ".opencode/swarm/dashboard.html",
-      "last_edit": "2026-09-04T10:29:45.712996+00:00",
-      "change_description": "Added DLQ card with 3s timeout decoupled polling"
+      "path": "flowcharts/fig3_operational_workflow.png",
+      "last_edit": "2026-09-05T07:46:48.354592+00:00",
+      "change_description": "Operational screening workflow Fig3"
     },
     {
-      "path": "services/scholarsearch/apps/server/src/services/search-orchestrator.ts",
-      "last_edit": "2026-09-04T10:29:45.818062+00:00",
-      "change_description": "Integrated server-side predatory filter with stdout logging"
+      "path": "flowcharts/flowcharts_mermaid.md",
+      "last_edit": "2026-09-05T07:46:48.429099+00:00",
+      "change_description": "Mermaid sources for 3 figures"
     },
     {
-      "path": "services/scholarsearch/packages/mcp-sources/src/mcp-server.ts",
-      "last_edit": "2026-09-04T10:29:45.934458+00:00",
-      "change_description": "Wrapped mcp-sources as stdio MCP with 2 tools"
+      "path": "Scoping_Review_Protocol_v7.6.md",
+      "last_edit": "2026-09-05T12:07:58.072867+00:00",
+      "change_description": "Replaced NICE NG179 with NICE CKS Dry eye disease rev Jan 2023"
     },
     {
-      "path": "opencode.json",
-      "last_edit": "2026-09-04T10:29:46.068367+00:00",
-      "change_description": "Exposed scholarsearch-sources MCP via node dist/mcp-server.js"
+      "path": ".opencode/session-state.json",
+      "last_edit": "2026-09-05T12:53:00.819983+00:00",
+      "change_description": "Updated objective to audit completed; session_count 6"
+    },
+    {
+      "path": "reports/P0_bibliography_audit.json",
+      "last_edit": "2026-09-05T13:00:14.373488+00:00",
+      "change_description": "Evicted verification_log from session-state to domain-appropriate location"
     }
   ],
   "active_blockers": [],
-  "next_action_trigger": null,
+  "next_action_trigger": "git add .opencode/session-state.json Scoping_Review_Protocol_v7.6.md Scoping_Review_Operations_Manual_v1.6.md .opencode/skills/session-state-tracker/state_tracker.py flowcharts/ && git status",
   "meta": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-09-04T10:29:46.068367+00:00",
-    "session_count": 0,
-    "total_tokens_saved": 0
+    "last_updated": "2026-09-05T13:01:20.978274+00:00",
+    "session_count": 6,
+    "total_tokens_saved": 280
   }
 }
