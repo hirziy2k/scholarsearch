@@ -233,8 +233,11 @@ export function parse(query: string): ASTNode {
 
 /**
  * Compile AST to PubMed E-utilities query syntax.
- * Uses [MeSH] for known terms, [All Fields] for free text.
- * Supports AND, OR, NOT, parentheses, quotes.
+ * EVIDENCE (VERIFIED OFFICIAL, registry: pubmed_api): esearch `term`
+ * accepts PubMed UI field tags, MeSH tags, and [ti|tiab|ad:~N] proximity.
+ * Default [All Fields] below is preserved for regression; use
+ * renderPubMedFielded()/renderMeSHHeading() in native-syntax.ts for
+ * fielded/MeSH-native output. Supports AND, OR, NOT, parentheses, quotes.
  */
 export function compilePubMed(ast: ASTNode): string {
   switch (ast.type) {
@@ -253,8 +256,9 @@ export function compilePubMed(ast: ASTNode): string {
 
 /**
  * Compile AST to OpenAlex search syntax.
- * OpenAlex uses natural language search with filter operators.
- * Boolean operators work in `default.search` parameter.
+ * EVIDENCE (VERIFIED OFFICIAL, registry: openalex_api): filter language has
+ * NO explicit OR/NOT (implicit AND; client-side union/exclusion required).
+ * `default.search` takes free text; .search suffixes scope fields.
  */
 export function compileOpenAlex(ast: ASTNode): string {
   switch (ast.type) {
@@ -273,8 +277,12 @@ export function compileOpenAlex(ast: ASTNode): string {
 
 /**
  * Compile AST to Crossref query syntax.
- * Crossref uses a simplified query syntax.
- * Quoted phrases, AND/OR/NOT operators.
+ * EVIDENCE (VERIFIED OFFICIAL, registry: crossref_api): Crossref REST API
+ * has NO Boolean operators (>=20% term-match rule; additive
+ * filter=name:value). Boolean-looking output below is NOT native — it is a
+ * best-effort passthrough flagged by validateForTarget() as
+ * UNSUPPORTED_BOOLEAN. NOT is emitted visibly (never silently dropped:
+ * dropping it would invert exclusion into inclusion).
  */
 export function compileCrossref(ast: ASTNode): string {
   switch (ast.type) {
@@ -287,14 +295,17 @@ export function compileCrossref(ast: ASTNode): string {
     case "or":
       return `${compileCrossref(ast.left)} OR ${compileCrossref(ast.right)}`;
     case "not":
-      return `${compileCrossref(ast.operand)}`;
+      return `NOT ${compileCrossref(ast.operand)}`;
   }
 }
 
 /**
  * Compile AST to Semantic Scholar query syntax.
- * S2 uses a simple search string. Boolean support is limited.
- * For complex queries, join with spaces (S2 does its own matching).
+ * EVIDENCE (VERIFIED OFFICIAL, registry: semantic_scholar_api): official FAQ
+ * states NO Boolean operators or wildcards; quoted phrases only. Complex
+ * queries are joined with spaces (S2 does its own matching); the
+ * local-intersection compensator restores AND precision. OR/NOT passthrough
+ * below is NOT native — flagged by validateForTarget().
  */
 export function compileSemanticScholar(ast: ASTNode): string {
   switch (ast.type) {
@@ -308,6 +319,50 @@ export function compileSemanticScholar(ast: ASTNode): string {
       return `${compileSemanticScholar(ast.left)} OR ${compileSemanticScholar(ast.right)}`;
     case "not":
       return `NOT ${compileSemanticScholar(ast.operand)}`;
+  }
+}
+
+/**
+ * Compile AST to Scopus Search API / advanced-search syntax.
+ * EVIDENCE (VERIFIED OFFICIAL, registry: scopus_api/scopus_ui): OR/AND/AND NOT
+ * with precedence OR > W/n,PRE/n > AND > AND NOT; TITLE-ABS-KEY combined
+ * field; W/n (unordered) / PRE/n (ordered) proximity. This compiler covers
+ * the Boolean+phrase core with correct AND NOT negation and full
+ * parenthesization; proximity needs renderScopusFielded()/native-syntax.ts
+ * (SUPPORTED_NEEDS_ADAPTER — no proximity node exists in the AST yet).
+ */
+export function compileScopus(ast: ASTNode): string {
+  switch (ast.type) {
+    case "term":
+      return `"${ast.value}"`;
+    case "phrase":
+      return `"${ast.value}"`;
+    case "and":
+      return `(${compileScopus(ast.left)} AND ${compileScopus(ast.right)})`;
+    case "or":
+      return `(${compileScopus(ast.left)} OR ${compileScopus(ast.right)})`;
+    case "not":
+      return `NOT (${compileScopus(ast.operand)})`;
+  }
+}
+
+/**
+ * Compile AST to CORE API v3 query passthrough.
+ * EVIDENCE: UNVERIFIED (registry: core_api) — no CORE syntax row exists in
+ * the evidence package. Generic q passthrough only; nothing native claimed.
+ */
+export function compileCore(ast: ASTNode): string {
+  switch (ast.type) {
+    case "term":
+      return `"${ast.value}"`;
+    case "phrase":
+      return `"${ast.value}"`;
+    case "and":
+      return `(${compileCore(ast.left)} AND ${compileCore(ast.right)})`;
+    case "or":
+      return `(${compileCore(ast.left)} OR ${compileCore(ast.right)})`;
+    case "not":
+      return `NOT ${compileCore(ast.operand)}`;
   }
 }
 
@@ -514,6 +569,8 @@ export const COMPILERS: Record<string, SourceCompiler> = {
   openalex: compileOpenAlex,
   crossref: compileCrossref,
   semantic_scholar: compileSemanticScholar,
+  scopus: compileScopus,
+  core: compileCore,
   eric: (ast) => compileERIC(ast),
   doaj: (ast) => compileDOAJ(ast),
 };

@@ -9,6 +9,8 @@ export * from "./utils/circuit-breaker.js";
 export * from "./utils/query-parser.js";
 export * from "./utils/cardinality.js";
 export * from "./utils/vocabulary-crosswalk.js";
+export * from "./utils/native-syntax.js";
+export * from "./data/native-syntax-registry.js";
 export * from "./utils/document-tiers.js";
 export * from "./utils/oa-resolver.js";
 export * from "./utils/query-versioning.js";

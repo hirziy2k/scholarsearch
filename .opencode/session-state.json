@@ -1,17 +1,37 @@
 {
-  "current_objective": "Day 1 execution: OSF registration then post-DOI live validation of frozen S1 v1.2",
+  "current_objective": "Integrate database-native syntax registry into ScholarSearch without touching protocol trio",
   "modified_infrastructure": [
     {
       "path": "Scoping_Review_Protocol_v7.6.md",
       "last_edit": "2026-09-05T20:07:00Z",
       "change_description": "Canonical protocol v7.6 — verified latest version on disk"
+    },
+    {
+      "path": "services/scholarsearch/packages/shared/src/data/native-syntax-registry.ts",
+      "last_edit": "2026-09-06T19:36:30.151240+00:00",
+      "change_description": "Canonical DB syntax registry with provenance"
+    },
+    {
+      "path": "services/scholarsearch/packages/shared/src/utils/native-syntax.ts",
+      "last_edit": "2026-09-06T19:36:30.228867+00:00",
+      "change_description": "Capability resolver validator renderers term classifier"
+    },
+    {
+      "path": "services/scholarsearch/packages/shared/src/utils/query-parser.ts",
+      "last_edit": "2026-09-06T19:36:30.304081+00:00",
+      "change_description": "Fixed Crossref NOT inversion added Scopus Core compilers"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/services/search-orchestrator.ts",
+      "last_edit": "2026-09-06T19:36:30.376390+00:00",
+      "change_description": "Wired Scopus client into dispatch map"
     }
   ],
   "active_blockers": [],
-  "next_action_trigger": "Register Scoping_Review_Protocol_v7.6.md + S1 v1.2 on OSF and capture DOI before any native execution",
+  "next_action_trigger": "Register Scoping_Review_Protocol_v7.6.md + S1 v1.2 on OSF and capture DOI",
   "meta": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-09-06T18:44:48.382398+00:00",
+    "last_updated": "2026-09-06T19:36:30.447932+00:00",
     "session_count": 1,
     "total_tokens_saved": 45000
   }

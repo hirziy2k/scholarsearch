@@ -393,7 +393,7 @@ export async function orchestrateSearch(
   } = compileForLocalIntersection(processedQuery, sources);
 
   // --- Step 3: Source client map (needed by cardinality pre-flight) ---
-  const clientMap: Record<string, OpenAlexClient | PubMedClient | SemanticScholarClient | CrossrefClient | CoreClient | EricClient | DoajClient> = {
+  const clientMap: Record<string, OpenAlexClient | PubMedClient | SemanticScholarClient | CrossrefClient | CoreClient | EricClient | DoajClient | ScopusClient> = {
     openalex,
     pubmed,
     semantic_scholar: semanticScholar,
@@ -401,6 +401,7 @@ export async function orchestrateSearch(
     core,
     eric,
     doaj,
+    scopus,
   };
 
   // --- Step 4a: Malay Clinical Vocabulary Injection ---
