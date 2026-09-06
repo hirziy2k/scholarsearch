@@ -1,5 +1,5 @@
 {
-  "current_objective": "Audit P0 resolved: passwords scrubbed, Redis running, config locked",
+  "current_objective": "Environment audit complete; scheduled task fix script ready",
   "modified_infrastructure": [
     {
       "path": "Scoping_Review_Protocol_v7.6.md",
@@ -120,13 +120,28 @@
       "path": ".opencode/CONFIG.md",
       "last_edit": "2026-09-06T08:23:05.483620+00:00",
       "change_description": "Redis version refs updated"
+    },
+    {
+      "path": ".opencode/swarm/redis.env",
+      "last_edit": "2026-09-06T08:46:24.129817+00:00",
+      "change_description": "Renamed from redis6380.env, port 6379"
+    },
+    {
+      "path": "scripts/fix-redis-task.ps1",
+      "last_edit": "2026-09-06T08:46:24.380694+00:00",
+      "change_description": "Redis8 scheduled task fix script (run elevated)"
+    },
+    {
+      "path": "opencode.json",
+      "last_edit": "2026-09-06T08:46:24.813412+00:00",
+      "change_description": "Set attrib +R (read-only)"
     }
   ],
   "active_blockers": [],
-  "next_action_trigger": "git add -A && git status",
+  "next_action_trigger": "run scripts/fix-redis-task.ps1 as admin to enable auto-start on logon",
   "meta": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-09-06T08:37:07.566956+00:00",
+    "last_updated": "2026-09-06T08:46:32.587397+00:00",
     "session_count": 6,
     "total_tokens_saved": 280
   }
