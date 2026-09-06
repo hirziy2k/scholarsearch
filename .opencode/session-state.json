@@ -1,17 +1,17 @@
 {
-  "current_objective": "Produce clean final Scoping Review Protocol for DED dry-eye symptoms and night-driving difficulty, then begin Day 1 execution (OSF registration + PubMed search)",
+  "current_objective": "Begin Day 1 execution of Scoping Review Protocol v7.6: register on OSF and run PubMed search",
   "modified_infrastructure": [
     {
-      "path": "Scoping_Review_Protocol_v6.0.md",
-      "last_edit": "2026-09-06T12:00:00Z",
-      "change_description": "Saved final consolidated protocol v6.0 as markdown file"
+      "path": "Scoping_Review_Protocol_v7.6.md",
+      "last_edit": "2026-09-05T20:07:00Z",
+      "change_description": "Canonical protocol v7.6 — verified latest version on disk"
     }
   ],
   "active_blockers": [],
-  "next_action_trigger": "Register protocol on OSF, then run PubMed search using Section 11.4 combined search string",
+  "next_action_trigger": "Register Scoping_Review_Protocol_v7.6.md on OSF, then run PubMed search using Section 11.4 combined search string",
   "meta": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-09-06T12:00:00Z",
+    "last_updated": "2026-09-06T17:45:00Z",
     "session_count": 1,
     "total_tokens_saved": 45000
   }
