@@ -4,10 +4,9 @@
 
 ```
 Default Project/
-├── opencode.json                    # OpenCode main config (instructions, MCP, compaction)
-├── tui.json                         # OpenCode TUI settings (cursor, scroll, attention)
-├── package.json                     # Project-level npm scripts (dev commands)
-├── compression_config.json          # ORPHANED — not used by OpenCode (legacy)
+├── opencode.json                    # OpenCode main config (instructions, MCP, compaction, permissions, security)
+├── tui.json                         # OpenCode TUI settings (cursor, scroll, attention) [optional]
+├── package.json                     # Project-level npm scripts (dev commands) [optional]
 ├── README.md                        # Project documentation
 └── .opencode/
     ├── .gitignore                   # Git ignore rules for .opencode/
@@ -43,28 +42,50 @@ opencode.json ────────────────► instructions: 
        │                                    ▼
        │                        context-discipline.md (10 rules)
        │
-       ├──► mcp: { pdf-tools, powerpoint }
+       ├──► mcp: { pdf-tools, powerpoint, scholarsearch-sources }
        │
-       └──► compaction: { auto, prune, reserved }
+       ├──► compaction: { auto, prune, reserved }
+       │
+       ├──► share: "disabled"
+       │
+       └──► permission:
+             ├── read: { credential deny rules }
+             └── edit: { opencode.json: deny }
 
-tui.json ─────────────────────► TUI appearance (cursor, scroll, attention)
+tui.json ─────────────────────► TUI appearance (cursor, scroll, attention) [optional]
 
 session-state.json ◄──────────► session-state-tracker skill (read/write via CLI)
 
 engine/model-aliases.json ────► orchestrate.py (OmniRoute routing, NOT OpenCode)
 ```
 
+## Security Posture (2026-09-06)
+
+**Filesystem protection:** `opencode.json` is NOT OS read-only (attrib=Archive). Protection is agent-level via `permission.edit` deny only.
+
+**Permission deny rules (project-level):**
+- `read` denied: `*.key`, `*.pem`, `id_rsa*`, `id_ed25519*`, `.aws/`, `.gcloud/`, `.ssh/`, `.gnupg/`, `.env` files
+- `edit` denied: `opencode.json` itself
+- `share`: explicitly disabled
+
+**Known limitations:**
+- Bash commands can bypass `read` deny rules (shell executes directly)
+- MCP servers run unsandboxed (same user context)
+- No OS-level sandbox (WSL2/Docker not installed)
+- Permission system is UI-level, not security boundary
+
+**Revert command:** `attrib -R "C:\Users\hirzi\OneDrive\Documents\Default Project\opencode.json"`
+
 ## What Reads What
 
 | Config File | Read By | Purpose |
 |-------------|---------|---------|
-| `opencode.json` | OpenCode | MCP servers, instructions, compaction |
-| `tui.json` | OpenCode | TUI appearance and behavior |
+| `opencode.json` | OpenCode | MCP servers, instructions, compaction, permissions, security |
+| `tui.json` | OpenCode | TUI appearance and behavior [optional] |
 | `.opencode/rules/*.md` | OpenCode | Agent behavior rules |
 | `.opencode/session-state.json` | session-state-tracker skill | Cross-session memory (canonical ledger) |
 | `.opencode/swarm/redis6380.env` | swarm/api_server.py | Redis Path 2 config (see swarm section) |
 | `.opencode/engine/model-aliases.json` | orchestrate.py | OmniRoute model routing |
-| `compression_config.json` | Nothing (orphaned) | Legacy, can be deleted |
 
 ## Dependency Map
 

@@ -8,6 +8,25 @@
   },
   "snapshot": true,
   "autoupdate": "notify",
+  "share": "disabled",
+  "permission": {
+    "read": {
+      "*.key": "deny",
+      "*.pem": "deny",
+      "id_rsa*": "deny",
+      "id_ed25519*": "deny",
+      ".aws/credentials": "deny",
+      ".aws/**": "deny",
+      ".gcloud/**": "deny",
+      ".ssh/**": "deny",
+      ".gnupg/**": "deny",
+      "**/.env": "deny",
+      "**/.env.*": "deny"
+    },
+    "edit": {
+      "opencode.json": "deny"
+    }
+  },
   "mcp": {
     "pdf-tools": {
       "type": "local",
