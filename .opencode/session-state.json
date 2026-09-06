@@ -1,18 +1,168 @@
 {
-  "current_objective": "Produce clean final Scoping Review Protocol for DED dry-eye symptoms and night-driving difficulty, then begin Day 1 execution (OSF registration + PubMed search)",
+  "current_objective": "Malaysian DIO regulatory mastery: Master Markdown harmonized + full harvest findings delivered, pending vocational/PUA141 final user review",
   "modified_infrastructure": [
     {
-      "path": "Scoping_Review_Protocol_v6.0.md",
-      "last_edit": "2026-09-06T12:00:00Z",
-      "change_description": "Saved final consolidated protocol v6.0 as markdown file"
+      "path": "Scoping_Review_Protocol_v7.6.md",
+      "last_edit": "2026-09-05T10:33:14.354456+00:00",
+      "change_description": "v7.7+v7.8 retracted, v7.6 current pre-DOI"
+    },
+    {
+      "path": "Scoping_Review_Source_Audit_CONSOLIDATED_2026-09-03.md",
+      "last_edit": "2026-09-05T10:33:14.419082+00:00",
+      "change_description": "P0 hygiene scope, HIGH-RISK verdict pending"
+    },
+    {
+      "path": "scoping_review_benchmark_extraction_TABLE_FULL.md",
+      "last_edit": "2026-09-05T10:33:14.492130+00:00",
+      "change_description": "Tier exemplars with honest OSF pending flags"
+    },
+    {
+      "path": "flowcharts/fig1_protocol_overview.png",
+      "last_edit": "2026-09-05T07:46:48.212010+00:00",
+      "change_description": "Protocol overview flowchart Fig1"
+    },
+    {
+      "path": "flowcharts/fig2_prisma_scr_flow.png",
+      "last_edit": "2026-09-05T07:46:48.283000+00:00",
+      "change_description": "PRISMA-ScR selection template Fig2"
+    },
+    {
+      "path": "flowcharts/fig3_operational_workflow.png",
+      "last_edit": "2026-09-05T07:46:48.354592+00:00",
+      "change_description": "Operational screening workflow Fig3"
+    },
+    {
+      "path": "flowcharts/flowcharts_mermaid.md",
+      "last_edit": "2026-09-05T07:46:48.429099+00:00",
+      "change_description": "Mermaid sources for 3 figures"
+    },
+    {
+      "path": "Scoping_Review_Protocol_v7.6.md",
+      "last_edit": "2026-09-05T12:07:58.072867+00:00",
+      "change_description": "Replaced NICE NG179 with NICE CKS Dry eye disease rev Jan 2023"
+    },
+    {
+      "path": ".opencode/session-state.json",
+      "last_edit": "2026-09-05T12:53:00.819983+00:00",
+      "change_description": "Updated objective to audit completed; session_count 6"
+    },
+    {
+      "path": "reports/P0_bibliography_audit.json",
+      "last_edit": "2026-09-05T13:00:14.373488+00:00",
+      "change_description": "Evicted verification_log from session-state to domain-appropriate location"
+    },
+    {
+      "path": "WINDOWS_OLD_AUDIT_PROTOCOL.md",
+      "last_edit": "2026-09-05T14:20:16.802697+00:00",
+      "change_description": "Updated with junction point check, external drive pause, .NET error guidance"
+    },
+    {
+      "path": "C:\\Windows.old_Audit\\CHECKPOINT.json",
+      "last_edit": "2026-09-05T14:20:16.881699+00:00",
+      "change_description": "Saved Phase 9 pause checkpoint"
+    },
+    {
+      "path": "C:\\Windows.old_Audit\\FRESH_AUDIT_COMPARISON.md",
+      "last_edit": "2026-09-05T14:20:16.961123+00:00",
+      "change_description": "Fresh audit vs previous findings comparison"
+    },
+    {
+      "path": "opencode.json",
+      "last_edit": "2026-09-06T00:53:48.592362+00:00",
+      "change_description": "Added permission deny rules + share disabled"
+    },
+    {
+      "path": ".opencode/CONFIG.md",
+      "last_edit": "2026-09-06T01:01:23.617662+00:00",
+      "change_description": "Updated with security posture and permission documentation"
+    },
+    {
+      "path": ".opencode/CONFIG.md",
+      "last_edit": "2026-09-06T07:22:58.521358+00:00",
+      "change_description": "Fixed share doc to disabled string"
+    },
+    {
+      "path": "opencode/swarm/redis6380.env",
+      "last_edit": "2026-09-06T08:21:25.444694+00:00",
+      "change_description": "Redis 8.10.1 upgrade docs"
+    },
+    {
+      "path": "opencode/skills/unified-engine-architecture/SKILL.md",
+      "last_edit": "2026-09-06T08:23:01.479278+00:00",
+      "change_description": "Redis port table updated"
+    },
+    {
+      "path": "services/pdf-engine/api_server.py",
+      "last_edit": "2026-09-06T08:23:02.846262+00:00",
+      "change_description": "Redis URL with password"
+    },
+    {
+      "path": "services/pdf-engine/job_queue.py",
+      "last_edit": "2026-09-06T08:23:03.948180+00:00",
+      "change_description": "Redis URL with password"
+    },
+    {
+      "path": "services/scholarsearch/.env",
+      "last_edit": "2026-09-06T08:23:04.332323+00:00",
+      "change_description": "Redis URL with password"
+    },
+    {
+      "path": "swarm/api_server.py",
+      "last_edit": "2026-09-06T08:23:04.787371+00:00",
+      "change_description": "Redis URL with password"
+    },
+    {
+      "path": "swarm/main.py",
+      "last_edit": "2026-09-06T08:23:05.066093+00:00",
+      "change_description": "Redis URL with password"
+    },
+    {
+      "path": ".opencode/CONFIG.md",
+      "last_edit": "2026-09-06T08:23:05.483620+00:00",
+      "change_description": "Redis version refs updated"
+    },
+    {
+      "path": ".opencode/swarm/redis.env",
+      "last_edit": "2026-09-06T08:46:24.129817+00:00",
+      "change_description": "Renamed from redis6380.env, port 6379"
+    },
+    {
+      "path": "scripts/fix-redis-task.ps1",
+      "last_edit": "2026-09-06T08:46:24.380694+00:00",
+      "change_description": "Redis8 scheduled task fix script (run elevated)"
+    },
+    {
+      "path": "opencode.json",
+      "last_edit": "2026-09-06T08:46:24.813412+00:00",
+      "change_description": "Set attrib +R (read-only)"
+    },
+    {
+      "path": ".opencode/session-state.json",
+      "last_edit": "2026-09-06T12:00:00.000000+00:00",
+      "change_description": "Full environment audit complete; 3 housekeeping items flagged"
+    },
+    {
+      "path": "WINDOWS_OLD_AUDIT_PROTOCOL.md",
+      "last_edit": "2026-09-06T08:59:49.728082+00:00",
+      "change_description": "Updated with junction point check, external drive pause, .NET error guidance"
+    },
+    {
+      "path": "Malaysian Diploma in Opticianry - Master Regulatory & OBE Reference 2026.md",
+      "last_edit": "2026-09-06T09:04:50.038570+00:00",
+      "change_description": "Harmonized Master updated with PUA440/PUA141, GWBL, vocational 3xC7 fix, timeline"
+    },
+    {
+      "path": "Malaysian DIO - Full Harvest Findings and Sources 2026-09-02.md",
+      "last_edit": "2026-09-06T09:04:50.124563+00:00",
+      "change_description": "Comprehensive 42-doc line-by-line harvest findings and source register"
     }
   ],
   "active_blockers": [],
-  "next_action_trigger": "Register protocol on OSF, then run PubMed search using Section 11.4 combined search string",
+  "next_action_trigger": "git log --oneline -5; verify PUA 141/2026 Second Schedule detailed text if MOC curriculum impact assessment requested",
   "meta": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-09-06T12:00:00Z",
-    "session_count": 1,
-    "total_tokens_saved": 45000
+    "last_updated": "2026-09-06T09:04:54.243316+00:00",
+    "session_count": 7,
+    "total_tokens_saved": 560
   }
 }
