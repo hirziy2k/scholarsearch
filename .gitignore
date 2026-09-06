@@ -97,4 +97,4 @@ Scoping_Review_Source_Audit_*.md
 WINDOWS_OLD_AUDIT_PROTOCOL.md
 
 # Redis Path 2 working copy (canonical ledger is .opencode/session-state.json)
-.opencode/swarm/redis6380.env.bak
+.opencode/swarm/redis.env.bak

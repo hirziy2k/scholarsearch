@@ -26,7 +26,7 @@ Default Project/
     ├── swarm/
     │   ├── api_server.py            # Swarm Cascade API (port 8084, CURRENT PRODUCTION)
     │   ├── orchestrator.py          # Swarm library (used by api_server)
-    │   ├── redis6380.env            # Path 2 Redis config (degraded on 3.0.504 until 7+)
+    │   ├── redis.env               # Redis config (upgraded to 8.10.1 on 2026-09-06)
     │   └── data-redis6380/          # Path 2 RDB dir (gitignored)
     ├── slide_state.py               # SQLite schema for engine (WAL, slide_state.sqlite)
     ├── compile_pptx.py              # PPTX compiler
@@ -59,7 +59,7 @@ session-state.json ◄──────────► session-state-tracker sk
 engine/model-aliases.json ────► orchestrate.py (OmniRoute routing, NOT OpenCode)
 ```
 
-## Security Posture (2026-09-06)
+## Security Posture (2026-09-06, updated 2026-09-06 Redis upgrade)
 
 **Filesystem protection:** `opencode.json` is NOT OS read-only (attrib=Archive). Protection is agent-level via `permission.edit` deny only.
 
@@ -84,7 +84,7 @@ engine/model-aliases.json ────► orchestrate.py (OmniRoute routing, NOT
 | `tui.json` | OpenCode | TUI appearance and behavior [optional] |
 | `.opencode/rules/*.md` | OpenCode | Agent behavior rules |
 | `.opencode/session-state.json` | session-state-tracker skill | Cross-session memory (canonical ledger) |
-| `.opencode/swarm/redis6380.env` | swarm/api_server.py | Redis Path 2 config (see swarm section) |
+| `.opencode/swarm/redis.env` | swarm/api_server.py | Redis config (8.10.1, password-protected) |
 | `.opencode/engine/model-aliases.json` | orchestrate.py | OmniRoute model routing |
 
 ## Dependency Map
