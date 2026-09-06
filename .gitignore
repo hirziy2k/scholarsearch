@@ -94,7 +94,6 @@ backup_pre-*/
 # OSF package PDFs and consolidated audits (generated, not sourced)
 Scoping_Review_Final_Package_*.pdf
 Scoping_Review_Source_Audit_*.md
-WINDOWS_OLD_AUDIT_PROTOCOL.md
 
 # Redis Path 2 working copy (canonical ledger is .opencode/session-state.json)
 .opencode/swarm/redis.env.bak
