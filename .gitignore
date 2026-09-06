@@ -58,6 +58,7 @@ services/scholarsearch/packages/*/dist/
 batch_*.json
 batch_*.csv
 temp_thesis.txt
+Scoping_Review_Protocol_v6.0.md
 tui.json
 
 # ===== Mendeley patcher local DB + build =====
