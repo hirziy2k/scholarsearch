@@ -54,3 +54,12 @@ jobs:
           sleep 10
           curl -f http://localhost:8000/v1/health || exit 1
           docker stop test-api
+
+      - name: Run E2E contract tests
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${GITHUB_SHA::7}}"
+          docker run -d --name contract-test -p 8000:8000 "$IMAGE"
+          sleep 10
+          pip install pytest httpx
+          python -m pytest tests/e2e_pdf_engine.py -v --tb=short
+          docker stop contract-test

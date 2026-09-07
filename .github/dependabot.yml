@@ -1,47 +1,109 @@
 version: 2
 updates:
-  # PDF-to-PPTX (Python)
+  # STREAM A: Security updates — immediate, no quarantine
+  - package-ecosystem: "pip"
+    directory: "/services/pdf-engine"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    labels:
+      - "security"
+      - "critical"
+    groups:
+      security-patches:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
+    # Bypass quarantine: security PRs auto-merge after E2E pass
+    reviewers: []
+
+  - package-ecosystem: "npm"
+    directory: "/services/scholarsearch"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    labels:
+      - "security"
+      - "critical"
+    groups:
+      security-patches:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 3
+    labels:
+      - "security"
+      - "ci"
+    groups:
+      security-patches:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
+
+  # STREAM B: Routine updates — 14-day quarantine
   - package-ecosystem: "pip"
     directory: "/services/pdf-engine"
     schedule:
       interval: "weekly"
       day: "monday"
-    commit-message:
-      prefix: "deps"
+    open-pull-requests-limit: 10
     labels:
       - "dependencies"
-      - "python"
+      - "quarantine"
+    groups:
+      routine-python:
+        patterns:
+          - "*"
+    # Quarantine enforced by dependabot-quarantine.yml workflow
 
-  # PDF-to-PPTX (Docker)
-  - package-ecosystem: "docker"
-    directory: "/services/pdf-engine"
-    schedule:
-      interval: "monthly"
-    commit-message:
-      prefix: "deps"
-    labels:
-      - "dependencies"
-      - "docker"
-
-  # ScholarSearch (npm)
   - package-ecosystem: "npm"
     directory: "/services/scholarsearch"
     schedule:
       interval: "weekly"
       day: "monday"
-    commit-message:
-      prefix: "deps"
+    open-pull-requests-limit: 10
     labels:
       - "dependencies"
-      - "node"
+      - "quarantine"
+    groups:
+      routine-node:
+        patterns:
+          - "*"
 
-  # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-    commit-message:
-      prefix: "ci"
+      day: "monday"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
+      - "quarantine"
       - "ci"
+    groups:
+      routine-ci:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "docker"
+    directory: "/services/pdf-engine"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "quarantine"
+      - "infra"
+    groups:
+      routine-docker:
+        patterns:
+          - "*"

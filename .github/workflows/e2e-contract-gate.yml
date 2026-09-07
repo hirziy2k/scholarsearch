@@ -1,0 +1,66 @@
+name: E2E Contract Gate
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e-pdf-engine:
+    runs-on: ubuntu-latest
+    services:
+      pdf-engine:
+        image: pdf-engine:latest
+        ports:
+          - 8000:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest httpx
+      - run: python -m pytest tests/e2e_pdf_engine.py -v --tb=short
+
+  e2e-scholarsearch:
+    runs-on: ubuntu-latest
+    services:
+      scholarsearch:
+        image: scholarsearch:latest
+        ports:
+          - 3001:3001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest httpx vcrpy pyyaml
+
+      - name: Check for invalidated cassettes (schema drift)
+        run: |
+          if [ -d "tests/cassettes/scholarsearch" ]; then
+            INVALID=$(ls tests/cassettes/scholarsearch/*.yaml.invalid 2>/dev/null || true)
+            if [ -n "$INVALID" ]; then
+              echo "ERROR: Schema drift detected. Invalidated cassettes found:"
+              echo "$INVALID"
+              echo ""
+              echo "Cassettes were invalidated by the daily drift detector."
+              echo "Re-record cassettes locally, then commit the updated files."
+              exit 1
+            fi
+          fi
+
+      - name: Verify cassettes exist (air-gap enforcement)
+        run: |
+          if [ ! -d "tests/cassettes/scholarsearch" ]; then
+            echo "ERROR: No cassettes directory found. E2E tests are air-gapped."
+            echo "Record cassettes locally first, then commit them."
+            exit 1
+          fi
+          if [ -z "$(ls -A tests/cassettes/scholarsearch/*.yaml 2>/dev/null)" ]; then
+            echo "ERROR: No cassette YAML files found."
+            echo "Run tests locally with VCR record_mode=all to generate cassettes."
+            exit 1
+          fi
+          echo "Valid cassettes:"
+          ls tests/cassettes/scholarsearch/*.yaml
+
+      - run: python -m pytest tests/e2e_scholarsearch.py -v --tb=short

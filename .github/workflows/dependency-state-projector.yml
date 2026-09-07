@@ -1,0 +1,597 @@
+name: Dependency State Projector
+
+on:
+  pull_request:
+    types: [opened, synchronize, closed, reopened]
+  repository_dispatch:
+    types: [dlq-retry, dlq-replay]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  project-state:
+    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gather dependency state
+        id: state
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const dependabotPrs = prs.filter(p => p.user.login === 'dependabot[bot]');
+
+            const state = dependabotPrs.map(pr => {
+              const labels = pr.labels.map(l => l.name);
+              const isSecurity = labels.includes('security');
+              const isQuarantine = labels.includes('quarantine');
+              const createdAt = new Date(pr.created_at);
+              const now = new Date();
+              const daysOpen = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+              const quarantineRemaining = isQuarantine ? Math.max(0, 14 - daysOpen) : 0;
+              const eligible = isSecurity || (isQuarantine && daysOpen >= 14);
+
+              const versionMatch = pr.title.match(/from\s+(\d+)\.(\d+)\.(\d+)\s+to\s+(\d+)\.(\d+)\.(\d+)/);
+              let volatility = 'UNKNOWN';
+              if (versionMatch) {
+                const fromMajor = Number(versionMatch[1]);
+                const toMajor = Number(versionMatch[4]);
+                const fromMinor = Number(versionMatch[2]);
+                const toMinor = Number(versionMatch[5]);
+                const majorLeap = toMajor - fromMajor;
+                const minorLeap = toMinor - fromMinor;
+                volatility = majorLeap > 0 ? 'HIGH' : (minorLeap > 5 ? 'MEDIUM' : 'LOW');
+              }
+
+              let ecosystem = 'unknown';
+              if (pr.title.includes('in /services/pdf-engine')) ecosystem = 'python';
+              else if (pr.title.includes('in /services/scholarsearch')) ecosystem = 'node';
+              else if (pr.title.includes('ci:')) ecosystem = 'github-actions';
+              else if (pr.title.includes('python from')) ecosystem = 'docker';
+
+              const packageMatch = pr.title.match(/bump\s+(\S+)/);
+              const packageName = packageMatch ? packageMatch[1] : 'unknown';
+
+              return {
+                pr_number: pr.number,
+                title: pr.title,
+                is_security: isSecurity,
+                is_quarantine: isQuarantine,
+                days_open: daysOpen,
+                quarantine_remaining_days: quarantineRemaining,
+                eligible_for_merge: eligible,
+                volatility,
+                ecosystem,
+                package_name: packageName,
+                url: pr.html_url,
+              };
+            });
+
+            const summary = {
+              timestamp: new Date().toISOString(),
+              total_open: state.length,
+              security_count: state.filter(s => s.is_security).length,
+              quarantine_count: state.filter(s => s.is_quarantine).length,
+              eligible_count: state.filter(s => s.eligible_for_merge).length,
+              blocked_count: state.filter(s => !s.eligible_for_merge).length,
+              high_risk_count: state.filter(s => s.volatility === 'HIGH').length,
+              prs: state,
+            };
+
+            console.log(JSON.stringify(summary, null, 2));
+            core.setOutput('summary', JSON.stringify(summary));
+
+      - name: Build normalized payload
+        id: payload
+        run: |
+          echo '${{ steps.state.outputs.summary }}' | python -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          normalized = {
+              'event_type': 'dependency_audit',
+              'timestamp': data['timestamp'],
+              'schema_version': '7.0',
+              'dependencies_table': [],
+              'vulnerability_events_table': [],
+              'quarantine_timers_table': [],
+          }
+          for pr in data['prs']:
+              normalized['dependencies_table'].append({
+                  'pr_number': pr['pr_number'],
+                  'package_name': pr['package_name'],
+                  'ecosystem': pr['ecosystem'],
+                  'is_security': pr['is_security'],
+                  'volatility': pr['volatility'],
+                  'status': 'eligible' if pr['eligible_for_merge'] else 'quarantined',
+                  'url': pr['url'],
+              })
+              if pr['is_security']:
+                  normalized['vulnerability_events_table'].append({
+                      'pr_number': pr['pr_number'],
+                      'package_name': pr['package_name'],
+                      'detected_at': data['timestamp'],
+                      'volatility': pr['volatility'],
+                      'requires_sandbox': pr['volatility'] == 'HIGH',
+                  })
+              if pr['is_quarantine']:
+                  normalized['quarantine_timers_table'].append({
+                      'pr_number': pr['pr_number'],
+                      'package_name': pr['package_name'],
+                      'created_days_ago': pr['days_open'],
+                      'remaining_days': pr['quarantine_remaining_days'],
+                      'eligible': pr['eligible_for_merge'],
+                  })
+          normalized['metrics'] = {
+              'total_dependencies': len(normalized['dependencies_table']),
+              'vulnerability_events': len(normalized['vulnerability_events_table']),
+              'quarantined': len(normalized['quarantine_timers_table']),
+              'eligible_for_merge': data['eligible_count'],
+              'high_risk_blocked': data['high_risk_count'],
+          }
+          print(json.dumps(normalized))
+          "
+
+      - name: Webhook projection with HMAC jittered reconciliation
+        id: webhook
+        run: |
+          echo '${{ steps.payload.outputs.stdout }}' | python -c "
+          import sys, json, os, urllib.request, hashlib, hmac, time, random
+          from pathlib import Path
+          from datetime import datetime
+
+          payload = json.load(sys.stdin)
+          webhook = os.environ.get('DEPENDENCY_WEBHOOK_URL')
+          hmac_secret = os.environ.get('PAYLOAD_HMAC_SECRET', 'sovereign-gateway-default-key')
+
+          if not webhook:
+              print('DEPENDENCY_WEBHOOK_URL not set — writing to DLQ')
+              dlq_dir = Path('dependency-dlq')
+              dlq_dir.mkdir(exist_ok=True)
+              filename = f'payload_{datetime.now().strftime(\"%Y%m%d_%H%M%S\")}.json'
+              (dlq_dir / filename).write_text(json.dumps(payload, indent=2))
+              sys.exit(0)
+
+          # Compute HMAC-SHA256 signature before mutation
+          canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'))
+          signature = hmac.new(hmac_secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
+
+          # Inject untyped signature column (Airtable/Softr won't mutate static strings)
+          payload['_signature'] = signature
+          payload['_timestamp'] = datetime.now().isoformat()
+
+          signed_canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'))
+          signed_payload = json.dumps(payload).encode()
+
+          req = urllib.request.Request(
+              webhook,
+              data=signed_payload,
+              headers={'Content-Type': 'application/json'},
+              method='POST'
+          )
+
+          try:
+              resp = urllib.request.urlopen(req, timeout=10)
+              status = resp.getcode()
+              body = resp.read().decode()
+
+              if status == 200:
+                  print(f'WEBHOOK CONFIRMED: HTTP 200')
+
+                  row_id = None
+                  try:
+                      receipt = json.loads(body)
+                      row_id = receipt.get('id') or receipt.get('row_id')
+                      if not row_id and 'records' in receipt and receipt['records']:
+                          row_id = receipt['records'][0].get('id')
+                  except json.JSONDecodeError:
+                      pass
+
+                  if not row_id:
+                      print('NO ROW ID — writing to DLQ')
+                      dlq_dir = Path('dependency-dlq-reconcile')
+                      dlq_dir.mkdir(exist_ok=True)
+                      filename = f'no_row_id_{datetime.now().strftime(\"%Y%m%d_%H%M%S\")}.json'
+                      (dlq_dir / filename).write_text(json.dumps({
+                          'payload': payload, 'receipt': body,
+                          'error': 'no_row_id', 'detected_at': datetime.now().isoformat(),
+                      }, indent=2))
+                      sys.exit(1)
+
+                  print(f'Row ID: {row_id} — jittered HMAC reconciliation')
+
+                  # JITTERED POLLING: 3s, 8s, 15s — survives eventual consistency
+                  poll_intervals = [3, 8, 15]
+                  hmac_verified = False
+
+                  for attempt, delay in enumerate(poll_intervals, 1):
+                      jitter = random.uniform(0, 1.5)
+                      wait = delay + jitter
+                      print(f'  Poll {attempt}/{len(poll_intervals)}: waiting {wait:.1f}s')
+                      time.sleep(wait)
+
+                      get_url = f'{webhook}/{row_id}'
+                      get_req = urllib.request.Request(
+                          get_url, headers={'Accept': 'application/json'}, method='GET'
+                      )
+
+                      try:
+                          get_resp = urllib.request.urlopen(get_req, timeout=10)
+                          get_status = get_resp.getcode()
+                          get_body = get_resp.read().decode()
+
+                          if get_status == 200:
+                              remote_data = json.loads(get_body)
+                              remote_sig = remote_data.get('_signature')
+
+                              if remote_sig and hmac.compare_digest(remote_sig, signature):
+                                  print(f'HMAC VALIDATED: {signature[:16]}... — incinerating')
+                                  hmac_verified = True
+                                  break
+                              else:
+                                  print(f'  HMAC missing/mismatch on poll {attempt} — retrying')
+                          else:
+                              print(f'  GET returned {get_status} on poll {attempt}')
+                      except Exception as get_err:
+                          print(f'  Poll {attempt} error: {get_err}')
+
+                  if hmac_verified:
+                      sys.exit(0)
+                  else:
+                      print(f'HMAC RECONCILIATION FAILED after {len(poll_intervals)} polls')
+                      dlq_dir = Path('dependency-dlq-reconcile')
+                      dlq_dir.mkdir(exist_ok=True)
+                      filename = f'hmac_fail_{datetime.now().strftime(\"%Y%m%d_%H%M%S\")}.json'
+                      (dlq_dir / filename).write_text(json.dumps({
+                          'payload': payload, 'row_id': row_id,
+                          'expected_signature': signature,
+                          'error': 'hmac_not_verified',
+                          'polls_attempted': len(poll_intervals),
+                          'detected_at': datetime.now().isoformat(),
+                      }, indent=2))
+                      sys.exit(1)
+
+              else:
+                  raise urllib.error.HTTPError(webhook, status, f'HTTP {status}', {}, None)
+
+          except urllib.error.HTTPError as e:
+              status_code = e.code
+
+              if 400 <= status_code < 500:
+                  print(f'SCHEMA DESYNC: HTTP {status_code}')
+                  dlq_dir = Path('dependency-dlq-schema-desync')
+                  dlq_dir.mkdir(exist_ok=True)
+                  filename = f'desync_{datetime.now().strftime(\"%Y%m%d_%H%M%S\")}.json'
+                  desync_record = {
+                      'original_payload': payload,
+                      'http_status': status_code,
+                      'error': str(e),
+                      'detected_at': datetime.now().isoformat(),
+                      'requires_manual_fix': True,
+                      'replay_status': 'pending',
+                  }
+                  (dlq_dir / filename).write_text(json.dumps(desync_record, indent=2))
+                  print(f'DESYNC: Written to {dlq_dir / filename}')
+
+              elif 500 <= status_code < 600:
+                  print(f'SERVER ERROR: HTTP {status_code}')
+                  dlq_dir = Path('dependency-dlq')
+                  dlq_dir.mkdir(exist_ok=True)
+                  filename = f'payload_{datetime.now().strftime(\"%Y%m%d_%H%M%S\")}.json'
+                  (dlq_dir / filename).write_text(json.dumps(payload, indent=2))
+
+          except Exception as e:
+              print(f'NETWORK ERROR: {e}')
+              dlq_dir = Path('dependency-dlq')
+              dlq_dir.mkdir(exist_ok=True)
+              filename = f'payload_{datetime.now().strftime(\"%Y%m%d_%H%M%S\")}.json'
+              (dlq_dir / filename).write_text(json.dumps(payload, indent=2))
+          "
+        env:
+          DEPENDENCY_WEBHOOK_URL: ${{ secrets.DEPENDENCY_WEBHOOK_URL }}
+          PAYLOAD_HMAC_SECRET: ${{ secrets.PAYLOAD_HMAC_SECRET }}
+
+      - name: Upload DLQ artifacts (transient only — no healed archives)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-dlq-${{ github.run_id }}
+          path: dependency-dlq/
+          retention-days: 30
+
+      - name: Upload reconciliation failures (hash mismatches)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dlq-reconcile-${{ github.run_id }}
+          path: dependency-dlq-reconcile/
+          retention-days: 30
+
+      - name: Upload schema desync alerts (unresolved only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema-desync-${{ github.run_id }}
+          path: dependency-dlq-schema-desync/
+          retention-days: 30
+
+  # SELF-HEALING REPLAY LOOP: Triggered manually after schema fix
+  dlq-replay:
+    if: github.event_name == 'repository_dispatch' && github.event.client_payload.event_type == 'dlq-replay'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Replay desync payloads chronologically
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const https = require('https');
+
+            const webhook = process.env.DEPENDENCY_WEBHOOK_URL;
+            if (!webhook) {
+              core.setFailed('DEPENDENCY_WEBHOOK_URL not configured');
+              return;
+            }
+
+            const desyncDir = path.join('dependency-dlq-schema-desync');
+            if (!fs.existsSync(desyncDir)) {
+              core.info('No desync payloads found — nothing to replay');
+              return;
+            }
+
+            // Get all desync files sorted chronologically
+            const files = fs.readdirSync(desyncDir)
+              .filter(f => f.startsWith('desync_') && f.endsWith('.json'))
+              .sort();
+
+            core.info(`Found ${files.length} desync payloads to replay`);
+
+            let succeeded = 0;
+            let failed = 0;
+
+            const crypto = require('crypto');
+            const hmacSecret = process.env.PAYLOAD_HMAC_SECRET || 'sovereign-gateway-default-key';
+
+            function computeHmac(payloadBytes) {
+              return crypto.createHmac('sha256', hmacSecret).update(payloadBytes).digest('hex');
+            }
+
+            function sleep(ms) {
+              return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            for (const file of files) {
+              const filePath = path.join(desyncDir, file);
+              try {
+                const desync = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                const payload = desync.original_payload;
+
+                // Sign the payload before replay
+                const canonical = JSON.stringify(payload, Object.keys(payload).sort());
+                const signature = computeHmac(Buffer.from(canonical));
+                payload._signature = signature;
+                payload._timestamp = new Date().toISOString();
+
+                core.info(`Replaying: ${file} (sig: ${signature.slice(0,16)}...)`);
+
+                const url = new URL(webhook);
+                const data = JSON.stringify(payload);
+
+                await new Promise((resolve, reject) => {
+                  const req = https.request({
+                    hostname: url.hostname,
+                    port: url.port,
+                    path: url.pathname,
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 15000,
+                  }, (res) => {
+                    let body = '';
+                    res.on('data', chunk => body += chunk);
+                    res.on('end', async () => {
+                      if (res.statusCode === 200) {
+                        let rowId = null;
+                        try {
+                          const receipt = JSON.parse(body);
+                          rowId = receipt.id || receipt.row_id;
+                          if (!rowId && receipt.records && receipt.records.length) {
+                            rowId = receipt.records[0].id;
+                          }
+                        } catch (_) {}
+
+                        if (!rowId) {
+                          core.warning(`NO ROW ID: ${file}`);
+                          failed++;
+                          resolve();
+                          return;
+                        }
+
+                        // Jittered HMAC polling: 3s, 8s, 15s
+                        const pollIntervals = [3000, 8000, 15000];
+                        let hmacVerified = false;
+
+                        for (let i = 0; i < pollIntervals.length; i++) {
+                          const jitter = Math.random() * 1500;
+                          const wait = pollIntervals[i] + jitter;
+                          core.info(`  Poll ${i+1}/${pollIntervals.length}: waiting ${Math.round(wait)}ms`);
+                          await sleep(wait);
+
+                          const getUrl = new URL(`${webhook}/${rowId}`);
+                          const getReq = https.request({
+                            hostname: getUrl.hostname,
+                            port: getUrl.port,
+                            path: getUrl.pathname,
+                            method: 'GET',
+                            headers: { 'Accept': 'application/json' },
+                            timeout: 10000,
+                          }, (getRes) => {
+                            let getBody = '';
+                            getRes.on('data', chunk => getBody += chunk);
+                            getRes.on('end', () => {
+                              if (getRes.statusCode === 200) {
+                                const remoteData = JSON.parse(getBody);
+                                const remoteSig = remoteData._signature;
+                                if (remoteSig && crypto.timingSafeEqual(
+                                  Buffer.from(remoteSig), Buffer.from(signature)
+                                )) {
+                                  core.info(`HMAC VALIDATED: ${signature.slice(0,16)} — incinerating`);
+                                  hmacVerified = true;
+                                }
+                              }
+                            });
+                          });
+                          getReq.on('error', () => {});
+                          getReq.end();
+                          // Wait for GET to complete
+                          await sleep(2000);
+
+                          if (hmacVerified) break;
+                        }
+
+                        if (hmacVerified) {
+                          fs.unlinkSync(filePath);
+                          succeeded++;
+                        } else {
+                          core.warning(`HMAC FAILED: ${file} — keeping in queue`);
+                          failed++;
+                        }
+                      } else if (res.statusCode >= 400 && res.statusCode < 500) {
+                        core.warning(`STILL DESYNC: ${file} — HTTP ${res.statusCode}`);
+                        failed++;
+                        resolve();
+                      } else {
+                        core.warning(`RETRYABLE: ${file} — HTTP ${res.statusCode}`);
+                        failed++;
+                        resolve();
+                      }
+                    });
+                  });
+
+                  req.on('error', (e) => {
+                    core.warning(`NETWORK ERROR: ${file} — ${e.message}`);
+                    failed++;
+                    resolve();
+                  });
+
+                  req.write(data);
+                  req.end();
+                });
+              } catch (e) {
+                core.warning(`FAILED: ${file} — ${e.message}`);
+                failed++;
+              }
+            }
+
+            core.info(`Replay complete: ${succeeded} healed, ${failed} remaining`);
+
+            if (failed > 0) {
+              core.warning(`${failed} payloads still need attention`);
+            }
+        env:
+          DEPENDENCY_WEBHOOK_URL: ${{ secrets.DEPENDENCY_WEBHOOK_URL }}
+          PAYLOAD_HMAC_SECRET: ${{ secrets.PAYLOAD_HMAC_SECRET }}
+
+  # EVENT-DRIVEN RETRY with SEMANTIC ERROR AWARENESS
+  dlq-sweep:
+    if: github.event_name == 'repository_dispatch' && github.event.client_payload.event_type == 'dlq-retry'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Exponential backoff retry (5xx only)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const payload = context.payload.client_payload;
+            const attempt = payload.attempt || 1;
+            const maxAttempts = payload.max_attempts || 5;
+            const baseDelay = payload.base_delay_seconds || 60;
+
+            core.info(`DLQ Retry: attempt ${attempt}/${maxAttempts}`);
+
+            if (attempt > maxAttempts) {
+              core.warning(`Max retries reached. Manual intervention required.`);
+              return;
+            }
+
+            const delaySeconds = baseDelay * Math.pow(2, attempt - 1);
+            core.info(`Backoff delay: ${delaySeconds}s`);
+
+            const { execSync } = require('child_process');
+            try {
+              execSync(`sleep ${delaySeconds}`, { stdio: 'ignore' });
+            } catch (e) {
+              core.info('Proceeding with retry...');
+            }
+
+            const webhook = process.env.DEPENDENCY_WEBHOOK_URL;
+            if (!webhook) {
+              core.warning('No webhook configured');
+              return;
+            }
+
+            const fs = require('fs');
+            const path = require('path');
+            const dlqDir = path.join('dependency-dlq');
+            if (!fs.existsSync(dlqDir)) {
+              core.info('No DLQ payloads found');
+              return;
+            }
+
+            const files = fs.readdirSync(dlqDir).filter(f => f.startsWith('payload_'));
+            for (const file of files) {
+              const filePath = path.join(dlqDir, file);
+              try {
+                const data = fs.readFileSync(filePath, 'utf8');
+                const https = require('https');
+                const url = new URL(webhook);
+
+                const req = https.request({
+                  hostname: url.hostname,
+                  port: url.port,
+                  path: url.pathname,
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  timeout: 10000,
+                }, (res) => {
+                  let body = '';
+                  res.on('data', chunk => body += chunk);
+                  res.on('end', () => {
+                    if (res.statusCode >= 500) {
+                      core.warning(`5xx: ${file} — retrying`);
+                    } else if (res.statusCode >= 400 && res.statusCode < 500) {
+                      core.error(`4xx SCHEMA DESYNC: ${file} — ABORTING`);
+                      const desyncDir = path.join('dependency-dlq-schema-desync');
+                      if (!fs.existsSync(desyncDir)) fs.mkdirSync(desyncDir, { recursive: true });
+                      fs.renameSync(filePath, path.join(desyncDir, `desync_${file}`));
+                    } else if (res.statusCode === 200) {
+                      core.info(`SUCCEEDED: ${file}`);
+                      fs.unlinkSync(filePath);
+                    }
+                  });
+                });
+
+                req.on('error', (e) => {
+                  core.warning(`ERROR: ${file} — ${e.message}`);
+                });
+
+                req.write(data);
+                req.end();
+              } catch (e) {
+                core.warning(`Failed: ${file} — ${e.message}`);
+              }
+            }
+        env:
+          DEPENDENCY_WEBHOOK_URL: ${{ secrets.DEPENDENCY_WEBHOOK_URL }}

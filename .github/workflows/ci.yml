@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Python 3.11
+      - name: Set up Python 3.11 (matches Dockerfile base image)
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -110,6 +110,25 @@ jobs:
           name: test-reports
           path: services/pdf-engine/test_results/*.html
           retention-days: 30
+
+  e2e-contract-gate:
+    runs-on: ubuntu-latest
+    needs: [test]
+    services:
+      pdf-engine:
+        build:
+          context: services/pdf-engine
+        ports:
+          - 8000:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest httpx
+      - run: python -m pytest tests/e2e_pdf_engine.py -v --tb=short
+        env:
+          PDF_ENGINE_URL: http://localhost:8000
 
   swarm-tests:
     runs-on: ubuntu-latest
