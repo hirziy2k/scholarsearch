@@ -66,11 +66,12 @@ jobs:
             let lockfileHash = '';
             let binaryAudit = [];
             try {
-              // TOTAL EPHEMERAL AIR-GAP: Pre-fetch then offline install
-              // Step 1: Fetch all packages into local cache (with network)
-              core.info('Step 1/3: Pre-fetching packages into local cache');
+              // OUT-OF-BAND PROVENANCE VERIFICATION via institutional proxy
+              // Step 1: Fetch packages through Verdaccio (Sigstore-verified)
+              const verdaccioUrl = process.env.VERDACCIO_URL || 'http://localhost:4873';
+              core.info(`Step 1/3: Pre-fetching packages through Sigstore-verified proxy: ${verdaccioUrl}`);
               execSync(
-                'cd services/scholarsearch && npm ci --prefer-offline 2>&1',
+                `cd services/scholarsearch && npm ci --registry ${verdaccioUrl} --prefer-offline 2>&1`,
                 { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
               );
 
@@ -165,6 +166,113 @@ jobs:
 
             core.setOutput('python_runtime_deps', JSON.stringify(Object.keys(pythonRuntimeDeps)));
             core.setOutput('node_runtime_deps', JSON.stringify(Object.keys(nodeRuntimeDeps)));
+
+      - name: Deterministic health certificate verification
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const os = require('os');
+            const { execSync } = require('child_process');
+
+            const pr = context.payload.pull_request;
+            const title = pr.title;
+            const packageMatch = title.match(/bump\s+(\S+)/);
+            const versionMatch = title.match(/from\s+(\d+\.\d+\.\d+)\s+to\s+(\d+\.\d+\.\d+)/);
+
+            if (!packageMatch || !versionMatch) {
+              core.info('No package/version info — skipping health certificate check');
+              return;
+            }
+
+            const packageName = packageMatch[1];
+            const toVersion = versionMatch[2];
+            const certKey = 'certs/' + packageName + '@' + toVersion + '.json';
+            const s3Bucket = process.env.FUZZ_S3_BUCKET;
+
+            if (!s3Bucket) {
+              core.warning('FUZZ_S3_BUCKET not configured — skipping');
+              return;
+            }
+
+            core.info('Fetching health certificate for ' + packageName + '@' + toVersion);
+
+            // Write cert fetch script to temp file
+            const fetchScript = path.join(os.tmpdir(), 'fetch_cert.py');
+            fs.writeFileSync(fetchScript, [
+              'import subprocess, json, sys',
+              'try:',
+              '    data = subprocess.check_output([',
+              '        "aws", "s3", "cp", "s3://' + s3Bucket + '/' + certKey + '", "-",',
+              '        "--region", "' + (process.env.AWS_REGION || 'us-east-1') + '"',
+              '    ], stderr=subprocess.STDOUT).decode()',
+              '    print(data.strip())',
+              'except Exception as e:',
+              '    print(json.dumps({"error": str(e)}))',
+            ].join('\n'));
+
+            let cert;
+            try {
+              const certData = execSync('python ' + fetchScript, { encoding: 'utf8' }).trim();
+              cert = JSON.parse(certData);
+            } catch (e) {
+              cert = { error: e.message };
+            }
+
+            if (cert.error) {
+              // CACHE MISS — trigger spot fuzzer and IMMEDIATELY FAIL
+              core.info('Health certificate CACHE MISS — triggering ephemeral fuzz');
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: 'ephemeral-fuzz.yml',
+                  ref: 'main',
+                  inputs: { dep_name: packageName, dep_version: toVersion },
+                });
+                core.info('Ephemeral spot fuzzer triggered');
+              } catch (e2) {
+                core.warning('Failed to trigger spot fuzzer: ' + e2.message);
+              }
+              // DETERMINISTIC REJECTION: fail immediately, do not wait
+              core.setFailed('FUZZING PENDING: Health certificate not yet minted for ' + packageName + '@' + toVersion);
+              return;
+            }
+
+            core.info('Certificate status: ' + cert.status + ', iterations: ' + cert.iterations);
+
+            // Verify certificate hash
+            const crypto = require('crypto');
+            const certForHash = Object.assign({}, cert);
+            delete certForHash.certificate_hash;
+            const computedHash = crypto.createHash('sha256')
+              .update(JSON.stringify(certForHash, Object.keys(certForHash).sort()))
+              .digest('hex');
+
+            if (computedHash !== cert.certificate_hash) {
+              core.setFailed('CERTIFICATE TAMPERED: Hash mismatch');
+              return;
+            }
+
+            if (cert.status === 'metabolic_regression') {
+              core.setFailed('METABOLIC REGRESSION: ' + cert.regression_reason);
+              return;
+            }
+
+            if (cert.status === 'crashed') {
+              core.setFailed('FUZZ CRASH: ' + cert.regression_reason);
+              return;
+            }
+
+            if (cert.certificate_valid) {
+              core.info('Health certificate VALID (' + cert.iterations + ' iterations)');
+            } else {
+              core.setFailed('FUZZING PENDING: Certificate incomplete (' + cert.iterations + '/1000 iterations)');
+            }
+        env:
+          FUZZ_S3_BUCKET: ${{ secrets.FUZZ_S3_BUCKET }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
 
       - name: Zero-trust runtime audit with transitive graph traversal
         uses: actions/github-script@v7

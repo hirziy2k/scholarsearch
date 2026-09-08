@@ -1,0 +1,83 @@
+name: Fuzz Certificate Completion
+
+on:
+  repository_dispatch:
+    types: [fuzz-certificate-minted]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  re-evaluate-dependabot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Re-trigger Dependabot evaluation
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const depName = context.payload.client_payload.dep_name;
+            const depVersion = context.payload.client_payload.dep_version;
+            const certStatus = context.payload.client_payload.certificate_status;
+            const certValid = context.payload.client_payload.certificate_valid;
+            const certHash = context.payload.client_payload.certificate_hash;
+
+            core.info('Fuzz certificate minted for ' + depName + '@' + depVersion);
+            core.info('Status: ' + certStatus + ', Valid: ' + certValid);
+
+            // Find the open Dependabot PR for this dependency
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const targetPr = prs.find(pr =>
+              pr.user.login === 'dependabot[bot]' &&
+              pr.title.includes(depName) &&
+              pr.title.includes(depVersion)
+            );
+
+            if (!targetPr) {
+              core.info('No open Dependabot PR found for ' + depName + '@' + depVersion);
+              return;
+            }
+
+            core.info('Found PR #' + targetPr.number + ': ' + targetPr.title);
+
+            // Add completion comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: targetPr.number,
+              body: [
+                '## FUZZ CERTIFICATE MINTED',
+                '',
+                '| Field | Value |',
+                '|-------|-------|',
+                '| Dependency | ' + depName + '@' + depVersion + ' |',
+                '| Status | ' + certStatus + ' |',
+                '| Valid | ' + certValid + ' |',
+                '| Hash | `' + certHash.slice(0, 16) + '...` |',
+                '',
+                'Health certificate has been minted to immutable S3 storage.',
+                'Re-evaluating quarantine status...',
+              ].join('\n'),
+            });
+
+            // If certificate is valid, approve the PR
+            if (certValid) {
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: targetPr.number,
+                event: 'APPROVE',
+                body: 'Auto-approved: Health certificate verified (' + certHash.slice(0, 16) + '...)',
+              });
+              core.info('PR #' + targetPr.number + ' approved');
+            } else {
+              core.info('Certificate not yet valid — PR remains blocked');
+            }

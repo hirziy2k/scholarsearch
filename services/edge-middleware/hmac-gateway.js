@@ -1,41 +1,69 @@
 /**
- * Edge-Compute Middleware: Deterministic HMAC Validation
- * ======================================================
- * Intercepts webhook payloads, validates HMAC-SHA256 signature,
- * then forwards valid payloads to the database.
+ * Edge-Compute Middleware: HMAC Validation + AES-GCM-256 Encryption
+ * =================================================================
+ * Validates HMAC-SHA256 signature, encrypts payload with AES-GCM-256,
+ * writes ciphertext to S3/R2. Dashboard decrypts client-side.
  *
- * The CI trusts the Edge. The Edge protects the Database.
- * No jittered polling — synchronous 200 OK at the edge.
- *
- * Deploy as: Cloudflare Worker / Vercel Edge Function / Deno Deploy
+ * The S3 bucket is public, but the data is mathematically dark.
+ * Only holders of the private key can decrypt.
  *
  * Environment variables:
  *   PAYLOAD_HMAC_SECRET — shared secret for HMAC computation
- *   DATABASE_WEBHOOK_URL — downstream database webhook endpoint
+ *   ENCRYPTION_KEY — AES-256 encryption key (hex-encoded, 64 chars)
+ *   S3_BUCKET — S3/R2 bucket name
+ *   S3_PREFIX — key prefix (default: "payloads")
  */
 
 const encoder = new TextEncoder();
 
-function computeHmac(secret, payload) {
-  const key = crypto.subtle.importKey(
+async function computeHmac(secret, payload) {
+  const key = await crypto.subtle.importKey(
     "raw",
     encoder.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
   );
-  return key.then((k) =>
-    crypto.subtle.sign("HMAC", k, encoder.encode(payload)).then((sig) =>
-      Array.from(new Uint8Array(sig))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("")
-    )
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function encryptPayload(plaintext, hexKey) {
+  // Derive AES-256-GCM key from hex key
+  const keyBytes = new Uint8Array(
+    hexKey.match(/.{2}/g).map((byte) => parseInt(byte, 16))
   );
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyBytes,
+    { name: "AES-GCM" },
+    false,
+    ["encrypt"]
+  );
+
+  // Generate random IV (96 bits for AES-GCM)
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  // Encrypt
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    encoder.encode(plaintext)
+  );
+
+  // Return IV + ciphertext as base64
+  const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(ciphertext), iv.length);
+
+  return btoa(String.fromCharCode(...combined));
 }
 
 export default {
   async fetch(request, env) {
-    // Only accept POST
     if (request.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed" }), {
         status: 405,
@@ -44,9 +72,11 @@ export default {
     }
 
     const HMAC_SECRET = env.PAYLOAD_HMAC_SECRET;
-    const DATABASE_URL = env.DATABASE_WEBHOOK_URL;
+    const ENCRYPTION_KEY = env.ENCRYPTION_KEY;
+    const S3_BUCKET = env.S3_BUCKET;
+    const S3_PREFIX = env.S3_PREFIX || "payloads";
 
-    if (!HMAC_SECRET || !DATABASE_URL) {
+    if (!HMAC_SECRET || !ENCRYPTION_KEY || !S3_BUCKET) {
       return new Response(JSON.stringify({ error: "Edge middleware not configured" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -64,7 +94,7 @@ export default {
       });
     }
 
-    // Extract signature from payload
+    // Extract signature
     const inboundSignature = payload._signature;
     if (!inboundSignature) {
       return new Response(JSON.stringify({ error: "Missing _signature field" }), {
@@ -73,7 +103,7 @@ export default {
       });
     }
 
-    // Compute expected HMAC from payload (excluding _signature and _timestamp)
+    // Compute expected HMAC
     const payloadForSign = { ...payload };
     delete payloadForSign._signature;
     delete payloadForSign._timestamp;
@@ -105,24 +135,46 @@ export default {
       });
     }
 
-    // HMAC validated — forward to database
+    // HMAC validated — encrypt and write to S3/R2
     try {
-      const dbResponse = await fetch(DATABASE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const payloadId = crypto.randomUUID();
+      const s3Key = `${S3_PREFIX}/${timestamp}_${payloadId}.json`;
 
-      const dbBody = await dbResponse.text();
+      // Encrypt payload with AES-GCM-256
+      const plaintext = JSON.stringify(payload);
+      const ciphertext = await encryptPayload(plaintext, ENCRYPTION_KEY);
 
-      // Return database response directly to CI
-      return new Response(dbBody, {
-        status: dbResponse.status,
-        headers: { "Content-Type": "application/json" },
-      });
+      // Write ciphertext to R2
+      if (env.R2_BUCKET) {
+        await env.R2_BUCKET.put(s3Key, ciphertext, {
+          httpMetadata: { contentType: "text/plain" },
+        });
+
+        return new Response(
+          JSON.stringify({
+            status: "encrypted_stored",
+            id: payloadId,
+            s3_key: s3Key,
+            bucket: S3_BUCKET,
+            public_url: `https://${S3_BUCKET}.r2.dev/${s3Key}`,
+            encryption: "AES-256-GCM",
+            message: "Payload encrypted and stored in public bucket",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ error: "No blob storage configured" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
     } catch (e) {
       return new Response(
-        JSON.stringify({ error: "Database forward failed", detail: e.message }),
+        JSON.stringify({ error: "Encryption/storage failed", detail: e.message }),
         { status: 502, headers: { "Content-Type": "application/json" } }
       );
     }
