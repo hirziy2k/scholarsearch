@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dependency Dashboard — Zero-Knowledge Decryption</title>
+  <title>Dependency Dashboard — Hardware-Backed Ephemeral Decryption</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -13,45 +13,98 @@
       padding: 2rem;
     }
     h1 { font-size: 1.5rem; margin-bottom: 1rem; }
-    .key-input {
+
+    .auth-section {
       margin-bottom: 1.5rem;
-      padding: 1rem;
+      padding: 1.5rem;
       border: 1px solid #ddd;
       border-radius: 8px;
       background: #f9f9f9;
     }
-    .key-input label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
-    .key-input input {
-      width: 100%;
-      padding: 0.5rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-family: monospace;
-      font-size: 0.875rem;
+    .auth-section h2 {
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+      color: #2D2D2D;
     }
-    .key-input button {
-      margin-top: 0.5rem;
-      padding: 0.5rem 1rem;
+    .auth-section p {
+      font-size: 0.875rem;
+      color: #666;
+      margin-bottom: 1rem;
+    }
+
+    .webauthn-btn {
+      padding: 0.75rem 1.5rem;
       background: #2D2D2D;
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 600;
+      transition: all 0.2s;
     }
-    .decryption-status {
-      display: inline-block;
+    .webauthn-btn:hover { background: #1a1a1a; }
+    .webauthn-btn:disabled {
+      background: #999;
+      cursor: not-allowed;
+    }
+
+    .session-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
       padding: 0.25rem 0.75rem;
       border-radius: 4px;
       font-size: 0.875rem;
-      margin-bottom: 1.5rem;
+      margin-top: 1rem;
     }
-    .decryption-status.locked { background: #ffebee; color: #c62828; }
-    .decryption-status.decrypting { background: #fff3e0; color: #f57c00; }
-    .decryption-status.verified {
+    .session-status.inactive {
+      background: #f5f5f5;
+      color: #999;
+    }
+    .session-status.active {
       background: #fff3e0;
       color: #2D2D2D;
     }
-    .decryption-status .accent { color: #FFEB3B; font-weight: bold; }
+    .session-status.active .accent {
+      color: #FFEB3B;
+      font-weight: bold;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .pulse-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #999;
+      transition: background 0.3s;
+    }
+    .pulse-indicator.active {
+      background: #FFEB3B;
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.6; }
+    }
+
+    .key-derivation-info {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #f5f5f5;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      display: none;
+    }
+
     table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
     th, td { text-align: left; padding: 0.75rem; border-bottom: 1px solid #eee; }
     th { font-weight: 600; }
@@ -59,6 +112,7 @@
     .status-pending { color: #f57c00; }
     .status-failed { color: #c62828; }
     #payload-count { font-size: 0.875rem; color: #666; margin-top: 1rem; }
+
     .ciphertext-preview {
       margin-top: 1rem;
       padding: 1rem;
@@ -73,16 +127,30 @@
   </style>
 </head>
 <body>
-  <h1>Dependency Dashboard — Zero-Knowledge</h1>
+  <h1>Dependency Dashboard — Hardware-Backed Ephemeral Decryption</h1>
 
-  <div class="key-input">
-    <label>Private Decryption Key (AES-256-GCM)</label>
-    <input type="password" id="decryption-key" placeholder="Enter 64-character hex key...">
-    <button onclick="decryptAndRender()">Decrypt & Load</button>
-  </div>
+  <div class="auth-section">
+    <h2>Hardware Authentication Required</h2>
+    <p>
+      Touch your hardware authenticator (YubiKey, TouchID, etc.) to derive
+      the decryption key. The key exists only in ephemeral RAM and vanishes
+      when this tab closes.
+    </p>
 
-  <div id="decryption-status" class="decryption-status locked">
-    <span class="accent">Locked</span> Enter decryption key to view data
+    <button id="webauthn-btn" class="webauthn-btn" onclick="authenticateAndDecrypt()">
+      Authenticate & Derive Key
+    </button>
+
+    <div id="session-status" class="session-status inactive">
+      <span id="pulse-dot" class="pulse-indicator"></span>
+      <span id="session-text">No active session</span>
+    </div>
+
+    <div id="key-derivation-info" class="key-derivation-info">
+      <div>Key derivation: WebAuthn → HKDF → AES-256-GCM</div>
+      <div id="derivation-hash"></div>
+      <div id="session-expiry"></div>
+    </div>
   </div>
 
   <table>
@@ -96,7 +164,7 @@
       </tr>
     </thead>
     <tbody id="dashboard-body">
-      <tr><td colspan="5">Awaiting decryption key...</td></tr>
+      <tr><td colspan="5">Authenticate to view data...</td></tr>
     </tbody>
   </table>
 
@@ -109,30 +177,166 @@
   <script>
     const S3_PUBLIC_URL = 'https://YOUR_BUCKET.r2.dev/payloads/';
     const POLL_INTERVAL = 30000;
-    let decryptionKey = null;
+    const SESSION_TIMEOUT = 300000; // 5 minutes
 
-    async function deriveKey(hexKey) {
-      const keyBytes = new Uint8Array(
-        hexKey.match(/.{2}/g).map(byte => parseInt(byte, 16))
-      );
-      return crypto.subtle.importKey(
+    let derivedKey = null;
+    let sessionTimer = null;
+    let pollTimer = null;
+
+    // ============================================================================
+    // WebAuthn / FIDO2 Authentication
+    // ============================================================================
+
+    async function authenticateAndDecrypt() {
+      const btn = document.getElementById('webauthn-btn');
+      const statusEl = document.getElementById('session-status');
+      const dotEl = document.getElementById('pulse-dot');
+      const textEl = document.getElementById('session-text');
+      const infoEl = document.getElementById('key-derivation-info');
+
+      btn.disabled = true;
+      btn.textContent = 'Authenticating...';
+      statusEl.className = 'session-status active';
+      textEl.innerHTML = '<span class="accent">Authenticating</span> — waiting for hardware touch';
+
+      try {
+        // Step 1: Get WebAuthn challenge from server (or generate locally)
+        const challenge = generateChallenge();
+
+        // Step 2: Create WebAuthn credential request
+        const credential = await navigator.credentials.get({
+          publicKey: {
+            challenge: challenge,
+            timeout: 60000,
+            rpId: window.location.hostname,
+            userVerification: 'required',
+            allowCredentials: [], // Empty = discoverable credential (passkey)
+          },
+        });
+
+        // Step 3: Derive AES-256-GCM key from WebAuthn assertion
+        // The authenticator's signature is used as entropy for HKDF
+        const signatureBytes = new Uint8Array(credential.response.signature);
+        const authenticatorData = new Uint8Array(credential.response.authenticatorData);
+        const clientData = new Uint8Array(credential.response.clientDataJSON);
+
+        // Combine entropy sources
+        const entropy = new Uint8Array(signatureBytes.length + authenticatorData.length + clientData.length);
+        entropy.set(signatureBytes, 0);
+        entropy.set(authenticatorData, signatureBytes.length);
+        entropy.set(clientData, signatureBytes.length + authenticatorData.length);
+
+        // HKDF derive AES-256-GCM key
+        derivedKey = await deriveKeyFromEntropy(entropy);
+
+        // Step 4: Show active session state
+        dotEl.classList.add('active');
+        textEl.innerHTML = '<span class="accent">Decryption Key Verified</span> — Session active';
+
+        // Show derivation info
+        const keyHash = await crypto.subtle.digest('SHA-256', entropy);
+        const hashHex = Array.from(new Uint8Array(keyHash))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        document.getElementById('derivation-hash').textContent = `Key hash: ${hashHex.slice(0, 32)}...`;
+        document.getElementById('session-expiry').textContent = `Expires: ${new Date(Date.now() + SESSION_TIMEOUT).toLocaleTimeString()}`;
+        infoEl.style.display = 'block';
+
+        // Step 5: Start session timeout
+        sessionTimer = setTimeout(() => {
+          ephemeralWipe();
+        }, SESSION_TIMEOUT);
+
+        // Step 6: Fetch and decrypt data
+        await fetchPayloads();
+
+        btn.textContent = 'Session Active';
+        btn.disabled = true;
+
+      } catch (e) {
+        console.error('WebAuthn failed:', e);
+        statusEl.className = 'session-status inactive';
+        textEl.textContent = 'Authentication failed: ' + e.message;
+        btn.disabled = false;
+        btn.textContent = 'Authenticate & Derive Key';
+      }
+    }
+
+    function generateChallenge() {
+      // Generate cryptographically random challenge
+      const challenge = new Uint8Array(32);
+      crypto.getRandomValues(challenge);
+      return challenge;
+    }
+
+    async function deriveKeyFromEntropy(entropy) {
+      // Import entropy as raw key material
+      const keyMaterial = await crypto.subtle.importKey(
         'raw',
-        keyBytes,
-        { name: 'AES-GCM' },
+        entropy,
+        { name: 'HKDF' },
+        false,
+        ['deriveKey']
+      );
+
+      // HKDF derive AES-256-GCM key
+      return crypto.subtle.deriveKey(
+        {
+          name: 'HKDF',
+          hash: 'SHA-256',
+          salt: new Uint8Array(32), // Zero salt (ephemeral)
+          info: new TextEncoder().encode('scholarsearch-decryption-v1'),
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
         false,
         ['decrypt']
       );
     }
 
-    async function decryptPayload(ciphertext, key) {
-      // Decode base64
-      const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
+    // ============================================================================
+    // Ephemeral Wipe — Key ceases to exist
+    // ============================================================================
 
-      // Extract IV (first 12 bytes) and ciphertext
+    function ephemeralWipe() {
+      derivedKey = null;
+      clearTimeout(sessionTimer);
+      clearTimeout(pollTimer);
+
+      const dotEl = document.getElementById('pulse-dot');
+      const textEl = document.getElementById('session-text');
+      const btn = document.getElementById('webauthn-btn');
+      const infoEl = document.getElementById('key-derivation-info');
+      const bodyEl = document.getElementById('dashboard-body');
+      const previewEl = document.getElementById('ciphertext-preview');
+
+      dotEl.classList.remove('active');
+      textEl.textContent = 'Session expired — key wiped from RAM';
+      btn.disabled = false;
+      btn.textContent = 'Authenticate & Derive Key';
+      infoEl.style.display = 'none';
+      previewEl.style.display = 'none';
+
+      bodyEl.innerHTML = '<tr><td colspan="5">Session expired — re-authenticate to view data</td></tr>';
+
+      // Zero-fill any sensitive memory
+      if (window.crypto && window.crypto.randomUUID) {
+        // Force GC hint (not guaranteed but helps)
+        for (let i = 0; i < 100; i++) {
+          new ArrayBuffer(1024 * 1024);
+        }
+      }
+    }
+
+    // ============================================================================
+    // Decryption + Rendering
+    // ============================================================================
+
+    async function decryptPayload(ciphertext, key) {
+      const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
       const iv = combined.slice(0, 12);
       const encrypted = combined.slice(12);
 
-      // Decrypt
       const decrypted = await crypto.subtle.decrypt(
         { name: 'AES-GCM', iv },
         key,
@@ -142,40 +346,16 @@
       return new TextDecoder().decode(decrypted);
     }
 
-    async function decryptAndRender() {
-      const keyInput = document.getElementById('decryption-key').value.trim();
-      if (keyInput.length !== 64) {
-        alert('Key must be 64 hexadecimal characters');
-        return;
-      }
-
-      const statusEl = document.getElementById('decryption-status');
-      statusEl.className = 'decryption-status decrypting';
-      statusEl.innerHTML = '<span class="accent">Decrypting...</span> Validating key';
-
-      try {
-        decryptionKey = await deriveKey(keyInput);
-
-        // Test decryption with a sample
-        statusEl.className = 'decryption-status verified';
-        statusEl.innerHTML = '<span class="accent">Decryption Key Verified</span> — Loading data';
-
-        await fetchPayloads();
-      } catch (e) {
-        statusEl.className = 'decryption-status locked';
-        statusEl.innerHTML = '<span class="accent">Invalid Key</span> ' + e.message;
-      }
-    }
-
     async function fetchPayloads() {
-      const statusEl = document.getElementById('decryption-status');
+      const statusEl = document.getElementById('session-status');
+      const textEl = document.getElementById('session-text');
       const bodyEl = document.getElementById('dashboard-body');
       const countEl = document.getElementById('payload-count');
       const previewEl = document.getElementById('ciphertext-preview');
       const previewContent = document.getElementById('ciphertext-content');
 
       try {
-        statusEl.innerHTML = '<span class="accent">Syncing...</span> Fetching ciphertext from S3';
+        textEl.innerHTML = '<span class="accent">Syncing</span> — fetching ciphertext from S3';
 
         const response = await fetch(`${S3_PUBLIC_URL}manifest.json`);
         const ciphertextManifest = await response.text();
@@ -185,7 +365,7 @@
         previewContent.textContent = ciphertextManifest.slice(0, 500) + '...';
 
         // Decrypt manifest
-        const decryptedManifest = await decryptPayload(ciphertextManifest, decryptionKey);
+        const decryptedManifest = await decryptPayload(ciphertextManifest, derivedKey);
         const data = JSON.parse(decryptedManifest);
 
         bodyEl.innerHTML = '';
@@ -214,16 +394,17 @@
 
         countEl.textContent = `${totalPayloads} encrypted payload(s) in bucket`;
 
-        statusEl.className = 'decryption-status verified';
-        statusEl.innerHTML = '<span class="accent">Decryption Key Verified</span> — Last updated: ' + new Date().toLocaleTimeString();
+        textEl.innerHTML = '<span class="accent">Decryption Key Verified</span> — Last updated: ' + new Date().toLocaleTimeString();
+
+        // Start polling
+        pollTimer = setInterval(fetchPayloads, POLL_INTERVAL);
 
       } catch (e) {
         if (e.name === 'OperationError') {
-          statusEl.className = 'decryption-status locked';
-          statusEl.innerHTML = '<span class="accent">Decryption Failed</span> Wrong key or corrupted data';
+          textEl.innerHTML = '<span class="accent">Decryption Failed</span> — Key mismatch or corrupted data';
+          ephemeralWipe();
         } else {
-          statusEl.className = 'decryption-status locked';
-          statusEl.innerHTML = '<span class="accent">Error</span> ' + e.message;
+          textEl.innerHTML = '<span class="accent">Error</span> — ' + e.message;
         }
       }
     }

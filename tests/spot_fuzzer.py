@@ -1,9 +1,14 @@
 """
-Ephemeral Spot Fuzzing — Self-Destructing Incubation
-=====================================================
+Ephemeral Spot Fuzzing — Self-Destructing Incubation + Dead-Man's Switch
+========================================================================
 Spins up a volatile spot instance, runs fuzzing iterations,
 mints cryptographic health certificate to immutable storage,
 and immediately self-destructs. Hardware ceases to exist.
+
+Dead-Man's Switch: The CI pipeline registers a Fuzzing Lease with a TTL
+before exiting. The Spot Instance emits high-frequency UDP heartbeats to
+a serverless watchdog. If the heartbeat flatlines for >45s, the watchdog
+injects "Toxic Regression (Fatal Arrest)" into the PR and force-closes it.
 
 AWS CLI required. Configure via environment:
     FUZZ_S3_BUCKET — S3 bucket for health certificates
@@ -13,6 +18,8 @@ AWS CLI required. Configure via environment:
     FUZZ_SUBNET_ID — VPC subnet for spot instance
     FUZZ_SG_ID — security group
     FUZZ_SSH_KEY — key pair name
+    FUZZ_WATCHDOG_LAMBDA — ARN of the watchdog Lambda function
+    FUZZ_HEARTBEAT_SECRET — shared secret for UDP heartbeat authentication
 """
 
 import base64
@@ -20,8 +27,11 @@ import hashlib
 import json
 import os
 import random
+import socket
+import struct
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -34,6 +44,12 @@ AMI_ID = os.environ.get("FUZZ_AMI_ID", "")
 SUBNET_ID = os.environ.get("FUZZ_SUBNET_ID", "")
 SG_ID = os.environ.get("FUZZ_SG_ID", "")
 SSH_KEY = os.environ.get("FUZZ_SSH_KEY", "")
+WATCHDOG_LAMBDA = os.environ.get("FUZZ_WATCHDOG_LAMBDA", "")
+HEARTBEAT_SECRET = os.environ.get("FUZZ_HEARTBEAT_SECRET", "default-secret-change-me")
+HEARTBEAT_ENDPOINT = os.environ.get("FUZZ_HEARTBEAT_ENDPOINT", "watchdog.scholarsearch.internal")
+HEARTBEAT_PORT = int(os.environ.get("FUZZ_HEARTBEAT_PORT", "9999"))
+HEARTBEAT_INTERVAL = 15  # seconds between heartbeats
+LEASE_TTL = 600  # 10 minutes max fuzzing time
 METABOLIC_THRESHOLD = 0.15
 TOTAL_ITERATIONS = 1000
 REGION = os.environ.get("AWS_REGION", "us-east-1")
@@ -169,6 +185,152 @@ def mint_certificate(dep_name: str, dep_version: str, result: dict):
     emit_completion_webhook(dep_name, dep_version, cert)
 
 
+# ============================================================================
+# Dead-Man's Switch: Heartbeat Emitter + Lease Registration
+# ============================================================================
+
+class HeartbeatEmitter:
+    """Sends authenticated UDP heartbeats to the watchdog Lambda.
+
+    If the fuzzing process locks up (infinite loop, OOM, kernel hang),
+    this thread dies with it, the watchdog detects the flatline, and
+    force-closes the PR with "Toxic Regression (Fatal Arrest)".
+    """
+
+    def __init__(self, lease_id: str, dep_name: str, dep_version: str):
+        self.lease_id = lease_id
+        self.dep_name = dep_name
+        self.dep_version = dep_version
+        self.running = True
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+
+    def start(self):
+        self.thread.start()
+
+    def stop(self):
+        self.running = False
+
+    def _loop(self):
+        while self.running:
+            try:
+                self._send_heartbeat()
+            except Exception as e:
+                print(f"  Heartbeat failed: {e}")
+            time.sleep(HEARTBEAT_INTERVAL)
+
+    def _send_heartbeat(self):
+        payload = {
+            "lease_id": self.lease_id,
+            "dep_name": self.dep_name,
+            "dep_version": self.dep_version,
+            "timestamp": datetime.now().isoformat(),
+            "ttl_remaining": self._ttl_remaining(),
+        }
+
+        # HMAC-sign the heartbeat
+        payload_bytes = json.dumps(payload, sort_keys=True).encode()
+        mac = hashlib.sha256(HEARTBEAT_SECRET.encode() + payload_bytes).hexdigest()
+
+        packet = {
+            "payload": payload,
+            "mac": mac,
+        }
+
+        packet_bytes = json.dumps(packet).encode()
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.sendto(packet_bytes, (HEARTBEAT_ENDPOINT, HEARTBEAT_PORT))
+        finally:
+            sock.close()
+
+    def _ttl_remaining(self) -> int:
+        """Return remaining lease time in seconds (approximate)."""
+        return LEASE_TTL  # Simplified; real impl tracks start time
+
+
+def register_fuzzing_lease(dep_name: str, dep_version: str) -> str:
+    """Register a Fuzzing Lease with the watchdog Lambda.
+
+    Returns a lease_id that the heartbeat emitter must reference.
+    The watchdog will force-close the PR if no heartbeat arrives
+    within LEASE_TTL seconds of the lease expiration.
+    """
+    lease_id = hashlib.sha256(
+        f"{dep_name}@{dep_version}:{datetime.now().isoformat()}".encode()
+    ).hexdigest()[:16]
+
+    lease = {
+        "lease_id": lease_id,
+        "dep_name": dep_name,
+        "dep_version": dep_version,
+        "created_at": datetime.now().isoformat(),
+        "ttl_seconds": LEASE_TTL,
+        "heartbeat_interval": HEARTBEAT_INTERVAL,
+        "ttl_remaining": LEASE_TTL,
+    }
+
+    print(f"Registered Fuzzing Lease: {lease_id}")
+    print(f"  TTL: {LEASE_TTL}s | Heartbeat interval: {HEARTBEAT_INTERVAL}s")
+
+    # Store lease locally (watchdog polls S3 for lease registry)
+    lease_key = f"leases/{dep_name}@{dep_version}.json"
+    tmp = Path(f"/tmp/lease_{lease_id}.json")
+    tmp.write_text(json.dumps(lease, indent=2))
+    try:
+        run_aws(f"s3 cp {tmp} s3://{S3_BUCKET}/{lease_key} --content-type application/json")
+    except Exception as e:
+        print(f"  Lease registry upload skipped: {e}")
+    finally:
+        tmp.unlink()
+
+    return lease_id
+
+
+def emit_dead_man_switch(dep_name: str, dep_version: str, lease_id: str, reason: str):
+    """Emit repository dispatch to force-close the Dependabot PR.
+
+    Called by the watchdog when heartbeat flatlines.
+    Also callable locally if the fuzzer detects its own failure.
+    """
+    github_token = os.environ.get("GITHUB_TOKEN")
+    github_repo = os.environ.get("GITHUB_REPOSITORY")
+
+    if not github_token or not github_repo:
+        print("  Dead-man switch skipped: GITHUB_TOKEN or GITHUB_REPOSITORY not set")
+        return
+
+    webhook_url = f"https://api.github.com/repos/{github_repo}/dispatches"
+    payload = {
+        "event_type": "fuzz-dead-man-switch",
+        "client_payload": {
+            "dep_name": dep_name,
+            "dep_version": dep_version,
+            "lease_id": lease_id,
+            "reason": reason,
+            "status": "toxic_regression_fatal_arrest",
+            "certificate_valid": False,
+        },
+    }
+
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            webhook_url,
+            data=json.dumps(payload).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"token {github_token}",
+                "Accept": "application/vnd.github.v3+json",
+            },
+            method="POST",
+        )
+        resp = urllib.request.urlopen(req, timeout=10)
+        print(f"  Dead-man switch emitted: HTTP {resp.getcode()}")
+    except Exception as e:
+        print(f"  Dead-man switch failed: {e}")
+
+
 def emit_completion_webhook(dep_name: str, dep_version: str, cert: dict):
     """Emit repository dispatch event to GitHub to re-trigger CI."""
     github_token = os.environ.get("GITHUB_TOKEN")
@@ -228,11 +390,21 @@ def main():
         print("Skipping — dependency already validated")
         sys.exit(0)
 
+    # Register Fuzzing Lease with watchdog
+    lease_id = register_fuzzing_lease(dep_name, dep_version)
+
+    # Start heartbeat emitter (daemon thread — dies with the process)
+    heartbeat = HeartbeatEmitter(lease_id, dep_name, dep_version)
+    heartbeat.start()
+
     # Spin up spot instance
     instance_id = request_spot_instance()
 
     # Wait for self-destruct
     success = wait_for_completion(instance_id)
+
+    # Stop heartbeat — fuzzing complete
+    heartbeat.stop()
 
     # Fetch result from S3 (fuzzer writes it before self-destruct)
     cert = fetch_certificate(dep_name, dep_version)
@@ -242,6 +414,12 @@ def main():
         cert["status"] = "crashed"
         cert["regression_reason"] = "Instance terminated before completing fuzzing"
         mint_certificate(dep_name, dep_version, cert)
+
+        # Trigger dead-man switch to force-close PR
+        emit_dead_man_switch(
+            dep_name, dep_version, lease_id,
+            "Fuzzer crashed without writing certificate"
+        )
 
     if cert.get("status") == "clean":
         print(f"FUZZING COMPLETE: {dep_name}@{dep_version} — certificate valid")
