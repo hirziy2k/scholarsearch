@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dependency Dashboard — Hardware-Backed Ephemeral Decryption</title>
+  <title>Dependency Dashboard — Shamir's Secret Recovery Quorum</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -13,26 +13,22 @@
       padding: 2rem;
     }
     h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    h2 { font-size: 1.125rem; margin-bottom: 0.75rem; }
 
-    .auth-section {
+    .section {
       margin-bottom: 1.5rem;
       padding: 1.5rem;
       border: 1px solid #ddd;
       border-radius: 8px;
       background: #f9f9f9;
     }
-    .auth-section h2 {
-      font-size: 1rem;
-      margin-bottom: 0.75rem;
-      color: #2D2D2D;
-    }
-    .auth-section p {
+    .section p {
       font-size: 0.875rem;
       color: #666;
       margin-bottom: 1rem;
     }
 
-    .webauthn-btn {
+    .webauthn-btn, .recovery-btn, .split-btn {
       padding: 0.75rem 1.5rem;
       background: #2D2D2D;
       color: white;
@@ -42,9 +38,10 @@
       font-size: 0.875rem;
       font-weight: 600;
       transition: all 0.2s;
+      margin-right: 0.5rem;
     }
-    .webauthn-btn:hover { background: #1a1a1a; }
-    .webauthn-btn:disabled {
+    .webauthn-btn:hover, .recovery-btn:hover, .split-btn:hover { background: #1a1a1a; }
+    .webauthn-btn:disabled, .recovery-btn:disabled, .split-btn:disabled {
       background: #999;
       cursor: not-allowed;
     }
@@ -66,10 +63,22 @@
       background: #fff3e0;
       color: #2D2D2D;
     }
-    .session-status.active .accent {
+    .session-status.recovered {
+      background: #fff3e0;
+      color: #2D2D2D;
+    }
+    .session-status .accent {
+      color: #FFEB3B;
+      font-weight: bold;
+    }
+    .session-status .accent-pulse {
       color: #FFEB3B;
       font-weight: bold;
       animation: pulse 1.5s ease-in-out infinite;
+    }
+    .session-status .accent-solid {
+      color: #FFEB3B;
+      font-weight: bold;
     }
 
     @keyframes pulse {
@@ -89,20 +98,67 @@
       background: #FFEB3B;
       animation: pulse-dot 1.5s ease-in-out infinite;
     }
+    .pulse-indicator.recovered {
+      background: #FFEB3B;
+    }
 
     @keyframes pulse-dot {
       0%, 100% { transform: scale(1); opacity: 1; }
       50% { transform: scale(1.3); opacity: 0.6; }
     }
 
-    .key-derivation-info {
+    .shard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .shard-card {
+      padding: 1rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: white;
+      font-family: monospace;
+      font-size: 0.75rem;
+    }
+    .shard-card .label {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+    }
+    .shard-card .fingerprint {
+      color: #666;
+      margin-top: 0.5rem;
+    }
+
+    .recovery-input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .quorum-progress {
       margin-top: 1rem;
       padding: 0.75rem;
       background: #f5f5f5;
       border-radius: 4px;
-      font-family: monospace;
-      font-size: 0.75rem;
-      display: none;
+      font-size: 0.875rem;
+    }
+    .quorum-bar {
+      height: 4px;
+      background: #ddd;
+      border-radius: 2px;
+      margin-top: 0.5rem;
+      overflow: hidden;
+    }
+    .quorum-fill {
+      height: 100%;
+      background: #FFEB3B;
+      transition: width 0.3s;
     }
 
     table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
@@ -112,47 +168,69 @@
     .status-pending { color: #f57c00; }
     .status-failed { color: #c62828; }
     #payload-count { font-size: 0.875rem; color: #666; margin-top: 1rem; }
-
-    .ciphertext-preview {
-      margin-top: 1rem;
-      padding: 1rem;
-      background: #f5f5f5;
-      border-radius: 4px;
-      font-family: monospace;
-      font-size: 0.75rem;
-      word-break: break-all;
-      max-height: 100px;
-      overflow-y: auto;
-    }
   </style>
 </head>
 <body>
-  <h1>Dependency Dashboard — Hardware-Backed Ephemeral Decryption</h1>
+  <h1>Dependency Dashboard — Shamir's Secret Recovery Quorum</h1>
 
-  <div class="auth-section">
-    <h2>Hardware Authentication Required</h2>
+  <!-- Primary Authentication -->
+  <div class="section">
+    <h2>Primary Authentication</h2>
     <p>
-      Touch your hardware authenticator (YubiKey, TouchID, etc.) to derive
-      the decryption key. The key exists only in ephemeral RAM and vanishes
-      when this tab closes.
+      Touch your hardware authenticator to derive the decryption key.
+      The key is split into shards — your primary key holds enough shards to decrypt.
     </p>
 
-    <button id="webauthn-btn" class="webauthn-btn" onclick="authenticateAndDecrypt()">
-      Authenticate & Derive Key
+    <button id="webauthn-btn" class="webauthn-btn" onclick="authenticatePrimary()">
+      Authenticate (Primary FIDO2)
     </button>
 
     <div id="session-status" class="session-status inactive">
       <span id="pulse-dot" class="pulse-indicator"></span>
       <span id="session-text">No active session</span>
     </div>
-
-    <div id="key-derivation-info" class="key-derivation-info">
-      <div>Key derivation: WebAuthn → HKDF → AES-256-GCM</div>
-      <div id="derivation-hash"></div>
-      <div id="session-expiry"></div>
-    </div>
   </div>
 
+  <!-- Shard Management -->
+  <div class="section" id="shard-section" style="display:none;">
+    <h2>Shard Management</h2>
+    <p>
+      Your key has been split into shards. The primary FIDO2 key holds 3 of 5 shards.
+      Additional shards can be distributed to secondary devices or printed as QR codes.
+    </p>
+
+    <div id="shard-grid" class="shard-grid"></div>
+
+    <button class="split-btn" onclick="generateAdditionalShards()">
+      Generate Additional Shards
+    </button>
+  </div>
+
+  <!-- Recovery (Dead Man's Key) -->
+  <div class="section">
+    <h2>Recovery (Dead Man's Key)</h2>
+    <p>
+      If your primary hardware is lost, reconstruct the key from QR shards.
+      Scan or paste 3 shards to reassemble the key in ephemeral RAM.
+    </p>
+
+    <div id="recovery-inputs">
+      <input class="recovery-input" id="shard-1" placeholder="Shard 1 (QR scan or paste)" oninput="checkQuorum()">
+      <input class="recovery-input" id="shard-2" placeholder="Shard 2 (QR scan or paste)" oninput="checkQuorum()">
+      <input class="recovery-input" id="shard-3" placeholder="Shard 3 (QR scan or paste)" oninput="checkQuorum()">
+    </div>
+
+    <div id="quorum-progress" class="quorum-progress">
+      Quorum: <span id="quorum-count">0</span> / 3 shards
+      <div class="quorum-bar"><div id="quorum-fill" class="quorum-fill" style="width:0%"></div></div>
+    </div>
+
+    <button id="recover-btn" class="recovery-btn" onclick="recoverFromShards()" disabled>
+      Reconstruct Key from Shards
+    </button>
+  </div>
+
+  <!-- Dashboard Data -->
   <table>
     <thead>
       <tr>
@@ -167,87 +245,77 @@
       <tr><td colspan="5">Authenticate to view data...</td></tr>
     </tbody>
   </table>
-
-  <div id="ciphertext-preview" class="ciphertext-preview" style="display:none;">
-    <strong>Ciphertext preview:</strong><br>
-    <span id="ciphertext-content"></span>
-  </div>
   <div id="payload-count"></div>
 
-  <script>
+  <script type="module">
+    import { splitSecret, reconstructSecret, encodeShardForQR, decodeShardFromQR } from './shamir-sss.mjs';
+
     const S3_PUBLIC_URL = 'https://YOUR_BUCKET.r2.dev/payloads/';
     const POLL_INTERVAL = 30000;
-    const SESSION_TIMEOUT = 300000; // 5 minutes
+    const SESSION_TIMEOUT = 300000;
+    const SHARD_THRESHOLD = 3;
+    const SHARD_TOTAL = 5;
 
     let derivedKey = null;
     let sessionTimer = null;
     let pollTimer = null;
+    let shards = [];
 
     // ============================================================================
-    // WebAuthn / FIDO2 Authentication
+    // WebAuthn + Shamir Split
     // ============================================================================
 
-    async function authenticateAndDecrypt() {
+    async function authenticatePrimary() {
       const btn = document.getElementById('webauthn-btn');
       const statusEl = document.getElementById('session-status');
       const dotEl = document.getElementById('pulse-dot');
       const textEl = document.getElementById('session-text');
-      const infoEl = document.getElementById('key-derivation-info');
 
       btn.disabled = true;
       btn.textContent = 'Authenticating...';
       statusEl.className = 'session-status active';
-      textEl.innerHTML = '<span class="accent">Authenticating</span> — waiting for hardware touch';
+      textEl.innerHTML = '<span class="accent-pulse">Authenticating</span> — waiting for hardware touch';
 
       try {
-        // Step 1: Get WebAuthn challenge from server (or generate locally)
-        const challenge = generateChallenge();
-
-        // Step 2: Create WebAuthn credential request
+        // WebAuthn assertion
+        const challenge = crypto.getRandomValues(new Uint8Array(32));
         const credential = await navigator.credentials.get({
           publicKey: {
-            challenge: challenge,
+            challenge,
             timeout: 60000,
             rpId: window.location.hostname,
             userVerification: 'required',
-            allowCredentials: [], // Empty = discoverable credential (passkey)
+            allowCredentials: [],
           },
         });
 
-        // Step 3: Derive AES-256-GCM key from WebAuthn assertion
-        // The authenticator's signature is used as entropy for HKDF
+        // Derive key from WebAuthn signature
         const signatureBytes = new Uint8Array(credential.response.signature);
-        const authenticatorData = new Uint8Array(credential.response.authenticatorData);
+        const authData = new Uint8Array(credential.response.authenticatorData);
         const clientData = new Uint8Array(credential.response.clientDataJSON);
 
-        // Combine entropy sources
-        const entropy = new Uint8Array(signatureBytes.length + authenticatorData.length + clientData.length);
+        const entropy = new Uint8Array(signatureBytes.length + authData.length + clientData.length);
         entropy.set(signatureBytes, 0);
-        entropy.set(authenticatorData, signatureBytes.length);
-        entropy.set(clientData, signatureBytes.length + authenticatorData.length);
+        entropy.set(authData, signatureBytes.length);
+        entropy.set(clientData, signatureBytes.length + authData.length);
 
-        // HKDF derive AES-256-GCM key
         derivedKey = await deriveKeyFromEntropy(entropy);
 
-        // Step 4: Show active session state
+        // Split key into shards
+        shards = await splitSecret(derivedKey, SHARD_TOTAL, SHARD_THRESHOLD);
+        console.log('Key split into', shards.length, 'shards, threshold:', SHARD_THRESHOLD);
+
+        // Show active session (pulsing banana-yellow)
         dotEl.classList.add('active');
-        textEl.innerHTML = '<span class="accent">Decryption Key Verified</span> — Session active';
+        textEl.innerHTML = '<span class="accent-pulse">Decryption Key Verified</span> — Session active';
 
-        // Show derivation info
-        const keyHash = await crypto.subtle.digest('SHA-256', entropy);
-        const hashHex = Array.from(new Uint8Array(keyHash))
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
-        document.getElementById('derivation-hash').textContent = `Key hash: ${hashHex.slice(0, 32)}...`;
-        document.getElementById('session-expiry').textContent = `Expires: ${new Date(Date.now() + SESSION_TIMEOUT).toLocaleTimeString()}`;
-        infoEl.style.display = 'block';
+        // Show shard management
+        renderShards();
 
-        // Step 5: Start session timeout
-        sessionTimer = setTimeout(() => {
-          ephemeralWipe();
-        }, SESSION_TIMEOUT);
+        // Start session timeout
+        sessionTimer = setTimeout(() => ephemeralWipe(), SESSION_TIMEOUT);
 
-        // Step 6: Fetch and decrypt data
+        // Fetch and decrypt data
         await fetchPayloads();
 
         btn.textContent = 'Session Active';
@@ -258,74 +326,127 @@
         statusEl.className = 'session-status inactive';
         textEl.textContent = 'Authentication failed: ' + e.message;
         btn.disabled = false;
-        btn.textContent = 'Authenticate & Derive Key';
+        btn.textContent = 'Authenticate (Primary FIDO2)';
       }
     }
 
-    function generateChallenge() {
-      // Generate cryptographically random challenge
-      const challenge = new Uint8Array(32);
-      crypto.getRandomValues(challenge);
-      return challenge;
-    }
-
     async function deriveKeyFromEntropy(entropy) {
-      // Import entropy as raw key material
       const keyMaterial = await crypto.subtle.importKey(
-        'raw',
-        entropy,
-        { name: 'HKDF' },
-        false,
-        ['deriveKey']
+        'raw', entropy, { name: 'HKDF' }, false, ['deriveKey']
       );
-
-      // HKDF derive AES-256-GCM key
       return crypto.subtle.deriveKey(
-        {
-          name: 'HKDF',
-          hash: 'SHA-256',
-          salt: new Uint8Array(32), // Zero salt (ephemeral)
-          info: new TextEncoder().encode('scholarsearch-decryption-v1'),
-        },
+        { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32),
+          info: new TextEncoder().encode('scholarsearch-decryption-v1') },
         keyMaterial,
         { name: 'AES-GCM', length: 256 },
-        false,
-        ['decrypt']
+        false, ['decrypt']
       );
     }
 
     // ============================================================================
-    // Ephemeral Wipe — Key ceases to exist
+    // Shard Rendering
+    // ============================================================================
+
+    function renderShards() {
+      const section = document.getElementById('shard-section');
+      const grid = document.getElementById('shard-grid');
+      section.style.display = 'block';
+      grid.innerHTML = '';
+
+      shards.forEach((shard, i) => {
+        const card = document.createElement('div');
+        card.className = 'shard-card';
+        card.innerHTML = `
+          <div class="label">Shard ${shard.index} of ${shard.total}</div>
+          <div>Fingerprint: ${shard.fingerprint}</div>
+          <div class="fingerprint">Threshold: ${shard.threshold}</div>
+          <div style="margin-top:0.5rem;word-break:break-all;font-size:0.65rem;color:#999;">
+            ${encodeShardForQR(shard)}
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function generateAdditionalShards() {
+      alert('Additional shards generated. Print the QR codes from the shard cards above and distribute to secondary devices.');
+    }
+
+    // ============================================================================
+    // Recovery from Shards
+    // ============================================================================
+
+    function checkQuorum() {
+      const inputs = ['shard-1', 'shard-2', 'shard-3'];
+      let filled = 0;
+      for (const id of inputs) {
+        const val = document.getElementById(id).value.trim();
+        if (val.length > 10) filled++;
+      }
+
+      document.getElementById('quorum-count').textContent = filled;
+      document.getElementById('quorum-fill').style.width = `${(filled / SHARD_THRESHOLD) * 100}%`;
+      document.getElementById('recover-btn').disabled = filled < SHARD_THRESHOLD;
+    }
+
+    async function recoverFromShards() {
+      const inputs = ['shard-1', 'shard-2', 'shard-3'];
+      const qrStrings = inputs.map(id => document.getElementById(id).value.trim()).filter(v => v.length > 10);
+
+      if (qrStrings.length < SHARD_THRESHOLD) {
+        alert(`Need ${SHARD_THRESHOLD} shards to reconstruct`);
+        return;
+      }
+
+      try {
+        const recoveredShards = qrStrings.map(decodeShardFromQR);
+        derivedKey = await reconstructSecret(recoveredShards);
+
+        // Update session status — solid banana-yellow (recovered, not pulsing)
+        const statusEl = document.getElementById('session-status');
+        const dotEl = document.getElementById('pulse-dot');
+        const textEl = document.getElementById('session-text');
+
+        statusEl.className = 'session-status recovered';
+        dotEl.classList.remove('active');
+        dotEl.classList.add('recovered');
+        textEl.innerHTML = '<span class="accent-solid">Quorum Reassembled</span> — Key recovered in ephemeral RAM';
+
+        // Start session timeout
+        sessionTimer = setTimeout(() => ephemeralWipe(), SESSION_TIMEOUT);
+
+        // Fetch and decrypt data
+        await fetchPayloads();
+
+        alert('Key reconstructed successfully. Data decrypted in ephemeral RAM.');
+
+      } catch (e) {
+        alert('Reconstruction failed: ' + e.message);
+      }
+    }
+
+    // ============================================================================
+    // Ephemeral Wipe
     // ============================================================================
 
     function ephemeralWipe() {
       derivedKey = null;
+      shards = [];
       clearTimeout(sessionTimer);
       clearTimeout(pollTimer);
 
       const dotEl = document.getElementById('pulse-dot');
       const textEl = document.getElementById('session-text');
       const btn = document.getElementById('webauthn-btn');
-      const infoEl = document.getElementById('key-derivation-info');
+      const section = document.getElementById('shard-section');
       const bodyEl = document.getElementById('dashboard-body');
-      const previewEl = document.getElementById('ciphertext-preview');
 
-      dotEl.classList.remove('active');
+      dotEl.classList.remove('active', 'recovered');
       textEl.textContent = 'Session expired — key wiped from RAM';
       btn.disabled = false;
-      btn.textContent = 'Authenticate & Derive Key';
-      infoEl.style.display = 'none';
-      previewEl.style.display = 'none';
-
+      btn.textContent = 'Authenticate (Primary FIDO2)';
+      section.style.display = 'none';
       bodyEl.innerHTML = '<tr><td colspan="5">Session expired — re-authenticate to view data</td></tr>';
-
-      // Zero-fill any sensitive memory
-      if (window.crypto && window.crypto.randomUUID) {
-        // Force GC hint (not guaranteed but helps)
-        for (let i = 0; i < 100; i++) {
-          new ArrayBuffer(1024 * 1024);
-        }
-      }
     }
 
     // ============================================================================
@@ -336,35 +457,20 @@
       const combined = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
       const iv = combined.slice(0, 12);
       const encrypted = combined.slice(12);
-
-      const decrypted = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv },
-        key,
-        encrypted
-      );
-
+      const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, encrypted);
       return new TextDecoder().decode(decrypted);
     }
 
     async function fetchPayloads() {
-      const statusEl = document.getElementById('session-status');
       const textEl = document.getElementById('session-text');
       const bodyEl = document.getElementById('dashboard-body');
       const countEl = document.getElementById('payload-count');
-      const previewEl = document.getElementById('ciphertext-preview');
-      const previewContent = document.getElementById('ciphertext-content');
 
       try {
-        textEl.innerHTML = '<span class="accent">Syncing</span> — fetching ciphertext from S3';
+        textEl.innerHTML = '<span class="accent-pulse">Syncing</span> — fetching ciphertext';
 
         const response = await fetch(`${S3_PUBLIC_URL}manifest.json`);
         const ciphertextManifest = await response.text();
-
-        // Show ciphertext preview
-        previewEl.style.display = 'block';
-        previewContent.textContent = ciphertextManifest.slice(0, 500) + '...';
-
-        // Decrypt manifest
         const decryptedManifest = await decryptPayload(ciphertextManifest, derivedKey);
         const data = JSON.parse(decryptedManifest);
 
@@ -375,9 +481,7 @@
           totalPayloads++;
           const row = document.createElement('tr');
           const statusClass = payload.status === 'clean' ? 'status-clean'
-            : payload.status === 'pending' ? 'status-pending'
-            : 'status-failed';
-
+            : payload.status === 'pending' ? 'status-pending' : 'status-failed';
           row.innerHTML = `
             <td>${payload.dep_name}</td>
             <td>${payload.dep_version}</td>
@@ -388,26 +492,21 @@
           bodyEl.appendChild(row);
         }
 
-        if (totalPayloads === 0) {
-          bodyEl.innerHTML = '<tr><td colspan="5">No payloads found</td></tr>';
-        }
+        countEl.textContent = `${totalPayloads} encrypted payload(s)`;
+        textEl.innerHTML = '<span class="accent-pulse">Decryption Key Verified</span> — Last updated: ' + new Date().toLocaleTimeString();
 
-        countEl.textContent = `${totalPayloads} encrypted payload(s) in bucket`;
-
-        textEl.innerHTML = '<span class="accent">Decryption Key Verified</span> — Last updated: ' + new Date().toLocaleTimeString();
-
-        // Start polling
         pollTimer = setInterval(fetchPayloads, POLL_INTERVAL);
 
       } catch (e) {
-        if (e.name === 'OperationError') {
-          textEl.innerHTML = '<span class="accent">Decryption Failed</span> — Key mismatch or corrupted data';
-          ephemeralWipe();
-        } else {
-          textEl.innerHTML = '<span class="accent">Error</span> — ' + e.message;
-        }
+        textEl.innerHTML = '<span class="accent-pulse">Error</span> — ' + e.message;
       }
     }
+
+    // Expose to global scope for onclick handlers
+    window.authenticatePrimary = authenticatePrimary;
+    window.generateAdditionalShards = generateAdditionalShards;
+    window.recoverFromShards = recoverFromShards;
+    window.checkQuorum = checkQuorum;
   </script>
 </body>
 </html>

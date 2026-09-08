@@ -1,5 +1,5 @@
 {
-  "current_objective": "Complete dependency management pipeline with zero-knowledge encryption, eBPF enforcement, and deterministic state-machine rejection",
+  "current_objective": "Complete dependency pipeline with zero-knowledge encryption, eBPF enforcement, deterministic rejection, dead-man's switch, V8 isolate sandbox, and WebAuthn ephemeral keys",
   "modified_infrastructure": [
     {
       "path": "Scoping_Review_Protocol_v7.6.md",
@@ -90,13 +90,38 @@
       "path": "services/edge-middleware/hmac-gateway.js",
       "last_edit": "2026-09-08T12:34:17.376350+00:00",
       "change_description": "AES-GCM-256 encryption before S3 write"
+    },
+    {
+      "path": "services/watchdog-lambda/handler.py",
+      "last_edit": "2026-09-08T14:25:24.812041+00:00",
+      "change_description": "Watchdog Lambda monitors heartbeats, force-closes PRs on flatline"
+    },
+    {
+      "path": "services/sandbox-loader/sandbox-loader.mjs",
+      "last_edit": "2026-09-08T14:25:24.888310+00:00",
+      "change_description": "V8 Isolate Context Tagging loader for unsigned Node.js packages"
+    },
+    {
+      "path": "services/dashboard/index.html",
+      "last_edit": "2026-09-08T14:25:24.958794+00:00",
+      "change_description": "WebAuthn/FIDO2 hardware-backed ephemeral decryption dashboard"
+    },
+    {
+      "path": "tests/spot_fuzzer.py",
+      "last_edit": "2026-09-08T14:25:30.718948+00:00",
+      "change_description": "Added heartbeat emitter + lease registration + dead-man switch"
+    },
+    {
+      "path": ".github/workflows/fuzz-completion.yml",
+      "last_edit": "2026-09-08T14:25:30.798720+00:00",
+      "change_description": "Handles both cert-minted and dead-man-switch events"
     }
   ],
   "active_blockers": [],
   "next_action_trigger": "python tests/spot_fuzzer.py fastapi 0.115.0",
   "meta": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-09-08T12:34:29.966231+00:00",
+    "last_updated": "2026-09-08T14:25:37.826614+00:00",
     "session_count": 1,
     "total_tokens_saved": 45000
   }
