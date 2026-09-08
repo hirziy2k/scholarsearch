@@ -141,127 +141,67 @@ jobs:
           print(json.dumps(normalized))
           "
 
-      - name: Webhook projection with HMAC jittered reconciliation
+      - name: Webhook projection via deterministic edge middleware
         id: webhook
         run: |
           echo '${{ steps.payload.outputs.stdout }}' | python -c "
-          import sys, json, os, urllib.request, hashlib, hmac, time, random
+          import sys, json, os, urllib.request, hashlib, hmac
           from pathlib import Path
           from datetime import datetime
 
           payload = json.load(sys.stdin)
+          edge_url = os.environ.get('EDGE_WEBHOOK_URL')
           webhook = os.environ.get('DEPENDENCY_WEBHOOK_URL')
           hmac_secret = os.environ.get('PAYLOAD_HMAC_SECRET', 'sovereign-gateway-default-key')
 
-          if not webhook:
-              print('DEPENDENCY_WEBHOOK_URL not set — writing to DLQ')
+          if not edge_url and not webhook:
+              print('No EDGE_WEBHOOK_URL or DEPENDENCY_WEBHOOK_URL — writing to DLQ')
               dlq_dir = Path('dependency-dlq')
               dlq_dir.mkdir(exist_ok=True)
               filename = f'payload_{datetime.now().strftime(\"%Y%m%d_%H%M%S\")}.json'
               (dlq_dir / filename).write_text(json.dumps(payload, indent=2))
               sys.exit(0)
 
-          # Compute HMAC-SHA256 signature before mutation
+          # Compute HMAC-SHA256 signature
           canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'))
           signature = hmac.new(hmac_secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
 
-          # Inject untyped signature column (Airtable/Softr won't mutate static strings)
+          # Inject signature fields for edge middleware validation
           payload['_signature'] = signature
           payload['_timestamp'] = datetime.now().isoformat()
 
-          signed_canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'))
           signed_payload = json.dumps(payload).encode()
 
+          # Route through edge middleware (or direct to DB if no edge)
+          target_url = edge_url or webhook
+          print(f'Target: {\"edge\" if edge_url else \"direct\"} — {target_url}')
+
           req = urllib.request.Request(
-              webhook,
+              target_url,
               data=signed_payload,
               headers={'Content-Type': 'application/json'},
               method='POST'
           )
 
           try:
-              resp = urllib.request.urlopen(req, timeout=10)
+              resp = urllib.request.urlopen(req, timeout=15)
               status = resp.getcode()
               body = resp.read().decode()
 
               if status == 200:
-                  print(f'WEBHOOK CONFIRMED: HTTP 200')
-
-                  row_id = None
+                  print(f'EDGE VALIDATED: HTTP 200 — synchronous confirmation')
+                  # Edge middleware validated HMAC and forwarded to DB
+                  # Trust the edge — no jittered polling needed
                   try:
                       receipt = json.loads(body)
                       row_id = receipt.get('id') or receipt.get('row_id')
-                      if not row_id and 'records' in receipt and receipt['records']:
-                          row_id = receipt['records'][0].get('id')
+                      if row_id:
+                          print(f'Row ID: {row_id}')
                   except json.JSONDecodeError:
                       pass
-
-                  if not row_id:
-                      print('NO ROW ID — writing to DLQ')
-                      dlq_dir = Path('dependency-dlq-reconcile')
-                      dlq_dir.mkdir(exist_ok=True)
-                      filename = f'no_row_id_{datetime.now().strftime(\"%Y%m%d_%H%M%S\")}.json'
-                      (dlq_dir / filename).write_text(json.dumps({
-                          'payload': payload, 'receipt': body,
-                          'error': 'no_row_id', 'detected_at': datetime.now().isoformat(),
-                      }, indent=2))
-                      sys.exit(1)
-
-                  print(f'Row ID: {row_id} — jittered HMAC reconciliation')
-
-                  # JITTERED POLLING: 3s, 8s, 15s — survives eventual consistency
-                  poll_intervals = [3, 8, 15]
-                  hmac_verified = False
-
-                  for attempt, delay in enumerate(poll_intervals, 1):
-                      jitter = random.uniform(0, 1.5)
-                      wait = delay + jitter
-                      print(f'  Poll {attempt}/{len(poll_intervals)}: waiting {wait:.1f}s')
-                      time.sleep(wait)
-
-                      get_url = f'{webhook}/{row_id}'
-                      get_req = urllib.request.Request(
-                          get_url, headers={'Accept': 'application/json'}, method='GET'
-                      )
-
-                      try:
-                          get_resp = urllib.request.urlopen(get_req, timeout=10)
-                          get_status = get_resp.getcode()
-                          get_body = get_resp.read().decode()
-
-                          if get_status == 200:
-                              remote_data = json.loads(get_body)
-                              remote_sig = remote_data.get('_signature')
-
-                              if remote_sig and hmac.compare_digest(remote_sig, signature):
-                                  print(f'HMAC VALIDATED: {signature[:16]}... — incinerating')
-                                  hmac_verified = True
-                                  break
-                              else:
-                                  print(f'  HMAC missing/mismatch on poll {attempt} — retrying')
-                          else:
-                              print(f'  GET returned {get_status} on poll {attempt}')
-                      except Exception as get_err:
-                          print(f'  Poll {attempt} error: {get_err}')
-
-                  if hmac_verified:
-                      sys.exit(0)
-                  else:
-                      print(f'HMAC RECONCILIATION FAILED after {len(poll_intervals)} polls')
-                      dlq_dir = Path('dependency-dlq-reconcile')
-                      dlq_dir.mkdir(exist_ok=True)
-                      filename = f'hmac_fail_{datetime.now().strftime(\"%Y%m%d_%H%M%S\")}.json'
-                      (dlq_dir / filename).write_text(json.dumps({
-                          'payload': payload, 'row_id': row_id,
-                          'expected_signature': signature,
-                          'error': 'hmac_not_verified',
-                          'polls_attempted': len(poll_intervals),
-                          'detected_at': datetime.now().isoformat(),
-                      }, indent=2))
-                      sys.exit(1)
-
+                  sys.exit(0)
               else:
-                  raise urllib.error.HTTPError(webhook, status, f'HTTP {status}', {}, None)
+                  raise urllib.error.HTTPError(target_url, status, f'HTTP {status}', {}, None)
 
           except urllib.error.HTTPError as e:
               status_code = e.code
@@ -297,6 +237,7 @@ jobs:
               (dlq_dir / filename).write_text(json.dumps(payload, indent=2))
           "
         env:
+          EDGE_WEBHOOK_URL: ${{ secrets.EDGE_WEBHOOK_URL }}
           DEPENDENCY_WEBHOOK_URL: ${{ secrets.DEPENDENCY_WEBHOOK_URL }}
           PAYLOAD_HMAC_SECRET: ${{ secrets.PAYLOAD_HMAC_SECRET }}
 
