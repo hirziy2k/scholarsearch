@@ -43,6 +43,8 @@ RUN groupadd -r pptxuser && useradd -r -g pptxuser -d /app -s /sbin/nologin pptx
 
 WORKDIR /app
 
+COPY . .
+
 RUN chown -R pptxuser:pptxuser /app
 
 USER pptxuser

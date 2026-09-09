@@ -22,14 +22,21 @@ jobs:
       - name: Build PDF Engine image
         run: docker build -t pdf-engine:latest services/pdf-engine
       - name: Run PDF Engine
-        run: docker run -d -p 8000:8000 --network host -e REDIS_URL=redis://127.0.0.1:6379/0 pdf-engine:latest
-      - name: Wait for PDF Engine readiness
+        run: docker run -d -p 8000:8000 -e REDIS_URL=redis://127.0.0.1:6379/0 pdf-engine:latest
+      - name: Wait for PDF Engine readiness and extract logs on failure
         run: |
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:8000/v1/health; then echo READY; break; fi
+          CONTAINER_ID=$(docker ps -q -f ancestor=pdf-engine:latest)
+          for i in {1..60}; do
+            if curl -sf http://127.0.0.1:8000/v1/health; then
+              echo "PDF Engine is healthy."
+              exit 0
+            fi
+            echo "Waiting for PDF Engine..."
             sleep 2
           done
-          curl -sf http://localhost:8000/v1/health
+          echo "PDF Engine failed to start. Extracting container logs:"
+          docker logs $CONTAINER_ID
+          exit 1
       - run: python -m pytest tests/e2e_pdf_engine.py -v --tb=short
         env:
           PDF_ENGINE_URL: http://localhost:8000
