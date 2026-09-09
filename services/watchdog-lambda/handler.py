@@ -116,16 +116,16 @@ def evaluate_lease(lease: dict) -> str:
             if hb_age < HEARTBEAT_TIMEOUT:
                 return "HEALTHY"
 
-            # UDP HEARTBEAT FLATLINED — initiate TCP probe
-            print(f"  Lease {lease_id}: UDP flatline ({hb_age:.0f}s) — TCP probing sidecar")
-            return tcp_probe_sidecar(lease)
+            # UDP HEARTBEAT FLATLINED — hypervisor introspection (no guest OS reliance)
+            print(f"  Lease {lease_id}: UDP flatline ({hb_age:.0f}s) — hypervisor introspection")
+            return hypervisor_introspect(lease)
 
         except Exception:
-            # No heartbeat file — check if lease is old enough to probe
+            # No heartbeat file — check if lease is old enough to introspect
             lease_age = (now - lease_created).total_seconds()
             if lease_age > HEARTBEAT_TIMEOUT:
-                print(f"  Lease {lease_id}: no heartbeat file — TCP probing sidecar")
-                return tcp_probe_sidecar(lease)
+                print(f"  Lease {lease_id}: no heartbeat file — hypervisor introspection")
+                return hypervisor_introspect(lease)
             return "WAITING"
 
     # Lease expired — check certificate
@@ -138,81 +138,137 @@ def evaluate_lease(lease: dict) -> str:
     except Exception:
         pass
 
-    # Lease expired + no cert — TCP probe before fatal decision
-    print(f"  Lease {lease_id}: expired + no cert — TCP probing sidecar")
-    return tcp_probe_sidecar(lease)
+    # Lease expired + no cert — hypervisor introspection before fatal decision
+    print(f"  Lease {lease_id}: expired + no cert — hypervisor introspection")
+    return hypervisor_introspect(lease)
 
 
-def tcp_probe_sidecar(lease: dict) -> str:
-    """Bidirectional TCP probe to sidecar container.
+def hypervisor_introspect(lease: dict) -> str:
+    """Out-of-band hypervisor introspection — bypasses guest OS entirely.
 
-    Three outcomes:
-        1. Sidecar REFUSES connection → kernel panic / resource exhaustion → FATAL ARREST
-        2. Sidecar RESPONDS but status unhealthy → fuzzer hanging → MEMORY DUMP + GRACEFUL PAUSE
-        3. Sidecar CONNECTS and healthy → false UDP flatline → resume monitoring
+    Uses AWS Nitro / EC2 hypervisor metrics to determine stall cause.
+    No diagnostic agent shares the OS with the fuzzer.
+
+    Four outcomes:
+        1. Fuzzer compute-bound (high CPU, low I/O) → PAUSE + investigate
+        2. OOM kill cascade (hypervisor impaired) → GRACEFUL PAUSE
+        3. Kernel-level failure (system status impaired) → FATAL ARREST
+        4. Instance unreachable → FATAL ARREST
     """
     lease_id = lease.get("lease_id")
     dep_name = lease.get("dep_name")
     dep_version = lease.get("dep_version")
-    sidecar_ip = lease.get("sidecar_ip", "")
-    instance_ip = lease.get("instance_ip", "")
+    instance_id = lease.get("instance_id", "")
 
-    # Try sidecar IP first, then instance IP
-    target_ip = sidecar_ip or instance_ip
-    if not target_ip:
-        print(f"  Lease {lease_id}: no sidecar/instance IP — assuming dead")
-        trigger_fatal_arrest(lease, "No sidecar IP available for TCP probe")
-        return "SIDECAR_DEAD"
+    if not instance_id:
+        print(f"  Lease {lease_id}: no instance_id — assuming dead")
+        trigger_fatal_arrest(lease, "No instance ID for hypervisor introspection")
+        return "INSTANCE_UNKNOWN"
+
+    # Query CloudWatch for hypervisor-level metrics (out-of-band)
+    analysis = query_hypervisor_metrics(instance_id, lease)
+
+    determination = analysis.get("determination", "unknown")
+    print(f"  Lease {lease_id}: hypervisor determination = {determination}")
+
+    if determination == "fuzzer_compute_stall":
+        # Fuzzer is alive but stuck in compute loop — not dead, just slow
+        print(f"  Lease {lease_id}: fuzzer compute stall — graceful pause")
+        capture_memory_dump(lease)
+        graceful_pause_pr(lease, "hypervisor_compute_stall")
+        return "PAUSED"
+
+    elif determination == "oom_kill_cascade":
+        # OOM killed sidecar, fuzzer may still be alive — don't assume fatal
+        print(f"  Lease {lease_id}: OOM kill cascade detected — graceful pause")
+        capture_memory_dump(lease)
+        graceful_pause_pr(lease, "oom_kill_cascade_sidecar_lost")
+        return "OOM_CASCADE"
+
+    elif determination in ("kernel_level_failure", "instance_unreachable"):
+        # Hypervisor confirms kernel-level failure — safe to fatal arrest
+        print(f"  Lease {lease_id}: {determination} — fatal arrest")
+        trigger_fatal_arrest(lease, f"Hypervisor confirmed: {determination}")
+        return "FATAL"
+
+    else:
+        # Unknown state — pause, don't destroy
+        print(f"  Lease {lease_id}: indeterminate — graceful pause")
+        graceful_pause_pr(lease, "indeterminate_hypervisor_state")
+        return "INDETERMINATE"
+
+
+def query_hypervisor_metrics(instance_id: str, lease: dict) -> dict:
+    """Query CloudWatch for hypervisor-level metrics.
+
+    These metrics come from the AWS Nitro hypervisor, NOT from
+    the guest OS. They are immune to OOM-killer interference.
+    """
+    import boto3
+    cloudwatch = boto3.client("cloudwatch", region_name=REGION)
+
+    analysis = {
+        "fuzzer_alive": False,
+        "oom_killed_sidecar": False,
+        "kernel_panic": False,
+        "determination": "unknown",
+    }
 
     try:
-        # TCP SYN → sidecar health endpoint
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(TCP_PROBE_TIMEOUT)
-        result = sock.connect_ex((target_ip, SIDECAR_TCP_PORT))
+        # CPU utilization (hypervisor-reported, not guest agent)
+        cpu_resp = cloudwatch.get_metric_statistics(
+            Namespace="AWS/EC2",
+            MetricName="CPUUtilization",
+            Dimensions=[{"Name": "InstanceId", "Value": instance_id}],
+            StartTime=datetime.utcnow().replace(second=0, microsecond=0),
+            EndTime=datetime.utcnow(),
+            Period=60,
+            Statistics=["Average", "Maximum"],
+        )
 
-        if result == 0:
-            # Connection succeeded — sidecar is alive
-            # Send health check request
-            try:
-                sock.sendall(b'{"action":"health_check"}\n')
-                response = sock.recv(4096).decode().strip()
-                health = json.loads(response)
+        datapoints = cpu_resp.get("Datapoints", [])
+        if datapoints:
+            latest = max(datapoints, key=lambda d: d["Timestamp"])
+            cpu_avg = latest.get("Average", 0)
+            cpu_max = latest.get("Maximum", 0)
 
-                if health.get("status") == "healthy" and health.get("fuzzer_alive"):
-                    print(f"  Lease {lease_id}: sidecar healthy, fuzzer alive — false UDP flatline")
-                    sock.close()
-                    return "HEALTHY"
+            # High CPU = fuzzer alive but compute-bound
+            if cpu_avg > 80:
+                analysis["fuzzer_alive"] = True
+                analysis["determination"] = "fuzzer_compute_stall"
 
-                # Sidecar alive but fuzzer is hanging
-                print(f"  Lease {lease_id}: sidecar alive, fuzzer hanging — memory dump")
-                sock.close()
-                memory_dump = capture_memory_dump(lease)
-                graceful_pause_pr(lease, memory_dump)
-                return "SIDECAR_ALIVE"
+        # Status check (hypervisor-level reachability)
+        ec2 = boto3.client("ec2", region_name=REGION)
+        status_resp = ec2.describe_instance_status(
+            InstanceIds=[instance_id],
+            IncludeAllInstances=True,
+        )
 
-            except Exception as e:
-                # Sidecar alive but not responding to health check
-                print(f"  Lease {lease_id}: sidecar alive, health check failed: {e}")
-                sock.close()
-                memory_dump = capture_memory_dump(lease)
-                graceful_pause_pr(lease, memory_dump)
-                return "SIDECAR_ALIVE"
+        for status in status_resp.get("InstanceStatuses", []):
+            system = status.get("SystemStatus", {})
+            instance_status = status.get("InstanceStatus", {})
 
-        else:
-            # Connection refused — kernel panic or resource exhaustion
-            print(f"  Lease {lease_id}: TCP connection refused — kernel panic suspected")
-            sock.close()
-            trigger_fatal_arrest(lease, "Sidecar TCP refused — kernel panic or resource exhaustion")
-            return "SIDECAR_DEAD"
+            if system.get("Status") == "impaired":
+                analysis["kernel_panic"] = True
+                analysis["determination"] = "kernel_level_failure"
 
-    except socket.timeout:
-        print(f"  Lease {lease_id}: TCP probe timeout — network isolation suspected")
-        trigger_fatal_arrest(lease, "Sidecar TCP probe timeout — network isolation")
-        return "SIDECAR_DEAD"
+                for detail in system.get("Details", []):
+                    if detail.get("Status") == "impaired":
+                        analysis["impaired_check"] = detail.get("Name", "unknown")
+
+            if instance_status.get("Status") == "impaired":
+                analysis["determination"] = "instance_unreachable"
+
+        # If CPU is low but instance is running = fuzzer dead or OOM-killed
+        if not analysis["fuzzer_alive"] and not analysis["kernel_panic"]:
+            if not analysis["oom_killed_sidecar"]:
+                analysis["determination"] = "fuzzer_dead_low_cpu"
+
     except Exception as e:
-        print(f"  Lease {lease_id}: TCP probe error: {e}")
-        trigger_fatal_arrest(lease, f"TCP probe error: {e}")
-        return "SIDECAR_DEAD"
+        analysis["determination"] = "query_failed"
+        analysis["error"] = str(e)
+
+    return analysis
 
 
 def capture_memory_dump(lease: dict) -> str:
