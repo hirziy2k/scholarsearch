@@ -22,7 +22,7 @@ jobs:
       - name: Build PDF Engine image
         run: docker build -t pdf-engine:latest services/pdf-engine
       - name: Run PDF Engine
-        run: docker run -d -p 8000:8000 -e REDIS_URL=redis://127.0.0.1:6379/0 pdf-engine:latest
+        run: docker run -d -p 8000:8000 --add-host=host.docker.internal:host-gateway -e REDIS_URL=redis://host.docker.internal:6379/0 pdf-engine:latest
       - name: Wait for PDF Engine readiness and extract logs on failure
         run: |
           CONTAINER_ID=$(docker ps -q -f ancestor=pdf-engine:latest)
