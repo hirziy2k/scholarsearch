@@ -1,17 +1,107 @@
 {
-  "current_objective": "OpenCode ecosystem cleanup complete — 8 orphaned services, stale batch files, diagnostic exhaust removed. Infrastructure epoch sealed (Commit 3c919b0).",
+  "current_objective": "v1.0.0 shipped. Production stack deployed. Beta cohort defined. Sprint complete.",
   "modified_infrastructure": [
     {
       "path": "services/scholarsearch/packages/shared/src/utils/native-syntax.ts",
       "last_edit": "2026-09-10T04:17:22.476143+00:00",
       "change_description": "Patched PROX_RE regex to catch bare ~N proximity operators"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/prisma/schema.prisma",
+      "last_edit": "2026-09-10T15:17:36.115719+00:00",
+      "change_description": "SQLite schema with SearchPage, ProtocolUpload, ExportRecord"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/db.ts",
+      "last_edit": "2026-09-10T15:17:36.190598+00:00",
+      "change_description": "Database init with WAL mode and busy_timeout"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/services/session-manager.ts",
+      "last_edit": "2026-09-10T15:17:36.260287+00:00",
+      "change_description": "Session CRUD and page storage"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/routes/polling.ts",
+      "last_edit": "2026-09-10T15:17:36.328136+00:00",
+      "change_description": "Lazy-loaded polling endpoint"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/utils/fetch-mutex.ts",
+      "last_edit": "2026-09-10T15:17:36.394751+00:00",
+      "change_description": "In-memory fetch deduplication"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/utils/page-validation.ts",
+      "last_edit": "2026-09-10T15:17:36.461805+00:00",
+      "change_description": "Payload validation before ORM write"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/server.ts",
+      "last_edit": "2026-09-10T15:17:36.528815+00:00",
+      "change_description": "Wired up db init, polling routes, graceful shutdown"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/services/metadata-verification.ts",
+      "last_edit": "2026-09-10T15:34:04.967668+00:00",
+      "change_description": "Trial registration regex extractor (NCT, ISRCTN, ACTRN, EUCTR, ChiCTR, IRCT, JPRN, CTRI, ReBEC)"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/services/ctgov-verifier.ts",
+      "last_edit": "2026-09-10T15:34:05.043323+00:00",
+      "change_description": "CT.gov cross-reference with 5s timeout and circuit breaker"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/services/geo-equity-override.ts",
+      "last_edit": "2026-09-10T15:34:05.108667+00:00",
+      "change_description": "Geopolitical equity weight inversion for ASEAN/East Asia"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/routes/adjudication.ts",
+      "last_edit": "2026-09-10T15:34:05.177285+00:00",
+      "change_description": "Adjudication endpoint and verification summary"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/server.ts",
+      "last_edit": "2026-09-10T15:34:05.244047+00:00",
+      "change_description": "Wired up adjudication routes"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/services/protocol-verification.ts",
+      "last_edit": "2026-09-10T15:47:08.732264+00:00",
+      "change_description": "Protocol gate: 5 keywords + apex source declaration regex"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/services/strict-translation.ts",
+      "last_edit": "2026-09-10T15:47:08.801994+00:00",
+      "change_description": "Parallel noun-phrase extraction from Boolean AST"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/services/strict-dispatch.ts",
+      "last_edit": "2026-09-10T15:47:08.871282+00:00",
+      "change_description": "Strict dispatch orchestrator"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/services/export-gate.ts",
+      "last_edit": "2026-09-10T15:47:08.936986+00:00",
+      "change_description": "Apex source lock with clinical brief downgrade"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/routes/export.ts",
+      "last_edit": "2026-09-10T15:47:09.005478+00:00",
+      "change_description": "Export endpoint with gate check"
+    },
+    {
+      "path": "services/scholarsearch/apps/server/src/server.ts",
+      "last_edit": "2026-09-10T15:47:09.071951+00:00",
+      "change_description": "Wired up export routes"
     }
   ],
   "active_blockers": [],
-  "next_action_trigger": "Await user direction for next task",
+  "next_action_trigger": "git checkout -b feat/persistence-foundation",
   "meta": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-09-10T05:05:56.692503+00:00",
+    "last_updated": "2026-09-10T16:31:15.376726+00:00",
     "session_count": 2,
     "total_tokens_saved": 52000
   }
