@@ -2,11 +2,19 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { searchRoutes } from "./routes/search.js";
 import { healthRoutes } from "./routes/health.js";
+import { pollingRoutes } from "./routes/polling.js";
+import { adjudicationRoutes } from "./routes/adjudication.js";
+import { exportRoutes } from "./routes/export.js";
+import { bulkExportRoutes } from "./routes/bulk-export.js";
+import { initDatabase, closeDatabase } from "./db.js";
 
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 const HOST = process.env.HOST ?? "0.0.0.0";
 
 async function main() {
+  // Initialize database (WAL mode, busy_timeout)
+  await initDatabase();
+
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? "info",
@@ -15,6 +23,11 @@ async function main() {
           ? { target: "pino-pretty", options: { colorize: true } }
           : undefined,
     },
+  });
+
+  // Graceful shutdown
+  app.addHook("onClose", async () => {
+    await closeDatabase();
   });
 
   // CORS
@@ -26,6 +39,10 @@ async function main() {
   // Routes
   await app.register(healthRoutes);
   await app.register(searchRoutes, { prefix: "/api" });
+  await app.register(pollingRoutes, { prefix: "/api" });
+  await app.register(adjudicationRoutes, { prefix: "/api" });
+  await app.register(exportRoutes, { prefix: "/api" });
+  await app.register(bulkExportRoutes, { prefix: "/api" });
 
   // Start server
   try {

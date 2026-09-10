@@ -1,12 +1,12 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// ScholarSearch Prisma Schema (SQLite)
+// All JSON fields stored as TEXT. Serialization handled in application code.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -16,18 +16,37 @@ datasource db {
 
 model SearchSession {
   id            String   @id @default(uuid())
+  searchId      String   @unique // External-facing UUID for API clients
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   // Query details
   rawQuery      String
-  expandedQuery Json?    // ExpandedQuery JSON
+  expandedQuery String?  // JSON: ExpandedQuery
   mode          String   // SearchMode enum value
-  filters       Json?    // SearchFilters JSON
-  weights       Json?    // RankingWeights JSON
+  filters       String?  // JSON: SearchFilters
+  weights       String?  // JSON: RankingWeights
+  region        String?
 
-  // Source results
-  sourcesQueried Json?   // Array of SourceSearchResult JSON
+  // Pipeline status
+  status        String   @default("partial") // partial | complete | failed
+  methodology   String?  // systematic | exploratory
+
+  // Protocol verification (systematic_review mode)
+  protocolHash  String?  // SHA-256 of extracted protocol text
+  protocolFile  String?  // Path to uploaded protocol PDF
+  protocolValid Boolean? // Whether protocol passed keyword verification
+  protocolKeywordCount Int? // How many of 5 keywords matched
+
+  // Source tracking
+  sourceStatuses String  @default("[]") // JSON array of {source, status, resultCount, error}
+
+  // Pagination
+  totalPages    Int      @default(0)
+  fetchedPages  Int      @default(0)
+
+  // TTL for cleanup
+  expiresAt     DateTime?
 
   // Statistics
   totalRawResults     Int @default(0)
@@ -40,7 +59,76 @@ model SearchSession {
 
   // Relations
   results       SearchResult[]
+  pages         SearchPage[]
   savedPapers   SavedPaper[]
+  exports       ExportRecord[]
+  protocols     ProtocolUpload[]
+}
+
+// ============================================
+// Paginated API Pages (Immutable Append-Only)
+// ============================================
+
+model SearchPage {
+  id            String   @id @default(uuid())
+  sessionId     String
+  session       SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  source        String
+  pageNumber    Int
+  rawResults    String   // JSON array of raw paper objects
+  hitCount      Int      @default(0)
+  fetchedAt     DateTime @default(now())
+
+  @@unique([sessionId, source, pageNumber])
+  @@index([sessionId])
+}
+
+// ============================================
+// Protocol Uploads
+// ============================================
+
+model ProtocolUpload {
+  id            String   @id @default(uuid())
+  sessionId     String
+  session       SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  fileName      String
+  filePath      String
+  textHash      String   // SHA-256 of extracted text
+  rawFileHash   String   // SHA-256 of raw bytes
+  extractedText String?  // First 5000 chars (audit trail)
+  keywordCount  Int
+  valid         Boolean
+  warnings      String   @default("[]") // JSON array of warning strings
+
+  createdAt     DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([textHash])
+}
+
+// ============================================
+// Export Records
+// ============================================
+
+model ExportRecord {
+  id            String   @id @default(uuid())
+  sessionId     String
+  session       SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  format        String   // ris | csv | json
+  status        String   @default("pending") // pending | compiling | complete | blocked
+  blockedReason String?
+  watermarked   Boolean  @default(false)
+  watermarkText String?
+  filePath      String?
+  resultCount   Int      @default(0)
+
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+
+  @@index([sessionId])
 }
 
 // ============================================
@@ -51,12 +139,10 @@ model SearchResult {
   id            String   @id @default(uuid())
   createdAt     DateTime @default(now())
 
-  // Links
   sessionId     String
   session       SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-  // Paper identification
-  dedupHash     String   @unique // SHA-256 hash for deduplication
+  dedupHash     String   @unique
   openalexId    String?
   semanticScholarId String?
   pubmedId      String?
@@ -64,48 +150,39 @@ model SearchResult {
   doi           String?
   arxivId       String?
 
-  // Core metadata
   title         String
-  authors       Json     // Array of Author JSON
+  authors       String   // JSON array of Author
   year          Int
   journalName   String?
   journalIssn   String?
   publisher     String?
   abstract      String?
-  keywords      Json     @default("[]") // Array of strings
-  meshTerms     Json     @default("[]") // Array of strings
-  concepts      Json     @default("[]") // Array of {name, score}
+  keywords      String   @default("[]") // JSON array of strings
+  meshTerms     String   @default("[]") // JSON array of strings
+  concepts      String   @default("[]") // JSON array of {name, score}
 
-  // Classification
   publicationType String
   studyDesign   String?
-  peerReviewStatus Json  // PeerReviewStatus JSON
+  peerReviewStatus String // JSON: PeerReviewStatus
   language      String?
   country       String?
 
-  // Metrics
-  citationCount Json?    // CitationCount JSON
-  journalMetrics Json?   // JournalMetrics JSON
+  citationCount String?  // JSON: CitationCount
+  journalMetrics String? // JSON: JournalMetrics
 
-  // Open Access
-  openAccessStatus Json  // OpenAccessStatus JSON
+  openAccessStatus String // JSON: OpenAccessStatus
   fullTextUrl   String?
 
-  // Retraction
-  retractionStatus Json  // RetractionStatus JSON
+  retractionStatus String // JSON: RetractionStatus
 
-  // Scoring
-  rankingScores Json     // RankingScores JSON
-  picoAlignment Json?    // PICOAlignment JSON
+  rankingScores String   // JSON: RankingScores
+  picoAlignment String?  // JSON: PICOAlignment
 
-  // Provenance
-  sourceDatabases Json  // Array of source names
-  provenance     Json   // Provenance JSON
+  sourceDatabases String // JSON array of source names
+  provenance     String  // JSON: Provenance
 
-  // Relevance explanation
   relevanceExplanation String?
 
-  // Indexes
   @@index([sessionId])
   @@index([doi])
   @@index([year])
@@ -121,27 +198,23 @@ model SavedPaper {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  // User (placeholder for future auth)
   userId        String   @default("anonymous")
 
-  // Paper reference
   sessionId     String?
   session       SearchSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
-  // Paper metadata (denormalized for independence)
   dedupHash     String
   title         String
   doi           String?
   year          Int
   journalName   String?
-  authors       Json
+  authors       String   // JSON array of Author
   abstract      String?
 
-  // User annotations
-  tags          Json     @default("[]") // Array of strings
+  tags          String   @default("[]") // JSON array of strings
   notes         String?
-  readStatus    String   @default("unread") // unread | reading | read
-  rating        Int?     // 1-5
+  readStatus    String   @default("unread")
+  rating        Int?
 
   @@index([userId])
   @@index([dedupHash])
@@ -155,9 +228,9 @@ model AuditLog {
   id            String   @id @default(uuid())
   createdAt     DateTime @default(now())
 
-  action        String   // search | export | save | api_call
-  details       Json
-  source        String?  // which API was called
+  action        String
+  details       String   // JSON
+  source        String?
   durationMs    Int?
   success       Boolean  @default(true)
   error         String?
