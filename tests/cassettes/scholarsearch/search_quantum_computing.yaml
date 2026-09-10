@@ -1,0 +1,43 @@
+interactions:
+- request:
+    body: '{"raw_query":"quantum_computing"}'
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '33'
+      content-type:
+      - application/json
+      host:
+      - localhost:3001
+      user-agent:
+      - python-httpx/0.28.1
+    method: POST
+    uri: http://localhost:3001/api/search/sync
+  response:
+    body:
+      string: "{\"searchId\":\"ef49c05f-ffca-47a8-837e-0dd539b10ac0\",\"totalRaw\":0,\"totalDeduplicated\":0,\"duplicatesRemoved\":0,\"entityBlockedCount\":0,\"durationMs\":3113,\"shadowMergeCount\":0,\"shadowMergeFlags\":[],\"degradedSources\":[],\"frozenWeights\":{},\"weightsFrozenAt\":1789008796873,\"needsLocalIntersection\":false,\"cardinalityPivot\":false,\"andUnsafeSources\":[],\"compiledQueries\":{\"openalex\":\"quantum_computing\",\"semantic_scholar\":\"quantum_computing\",\"crossref\":\"\\\"quantum_computing\\\"\",\"core\":\"\\\"quantum_computing\\\"\",\"eric\":\"\\\"quantum_computing\\\"\",\"doaj\":\"\\\"quantum_computing\\\"\",\"scopus\":\"\\\"quantum_computing\\\"\"},\"tierClassifications\":[],\"queryVersionHash\":{\"hash\":\"f168699757ada38115773d42c5a53068b1a78424d340bfc1890d745cba14b24b\",\"timestamp\":\"2026-09-10T02:53:16.873Z\",\"astFingerprint\":\"{type:str:4,value:str:17}\",\"endpoints\":[\"core\",\"crossref\",\"doaj\",\"eric\",\"openalex\",\"scopus\",\"semantic_scholar\"],\"region\":\"US\",\"description\":\"Query:
+        core+crossref+doaj+eric+openalex+scopus+semantic_scholar @ US | 0 results
+        | AST: {type:str:4,valu...\"},\"gapAnalysis\":{\"hasGaps\":false,\"gaps\":[],\"evidenceQuality\":0,\"bannerText\":\"Evidence
+        quality: 0% \u2014 0 results analyzed.\",\"globalAuditTrail\":{\"queryParameters\":[\"quantum_computing\",\"quantum_computing\",\"quantum_computing\",\"\\\"quantum_computing\\\"\",\"\\\"quantum_computing\\\"\",\"\\\"quantum_computing\\\"\",\"\\\"quantum_computing\\\"\",\"\\\"quantum_computing\\\"\"],\"sourcesQueried\":[\"openalex\",\"semantic_scholar\",\"crossref\",\"core\",\"eric\",\"doaj\",\"scopus\"],\"taxonomyNodesChecked\":[],\"tierDistribution\":{},\"totalResultsAnalyzed\":0,\"analyzedAt\":\"2026-09-10T02:53:16.873Z\"}},\"compact\":false,\"results\":[]}"
+    headers:
+      access-control-allow-origin:
+      - http://localhost:3000
+      connection:
+      - keep-alive
+      content-length:
+      - '1595'
+      content-type:
+      - application/json; charset=utf-8
+      date:
+      - Thu, 10 Sep 2026 02:53:16 GMT
+      keep-alive:
+      - timeout=72
+    status:
+      code: 200
+      message: OK
+version: 1
