@@ -108,7 +108,7 @@ export interface DetectedFeatures {
   proximity_truncation_conflict: boolean; // PubMed: * inside a proximity span
 }
 
-const PROX_RE = /\b(NEAR|NEXT|ONEAR|ADJ|SAME|AROUND)\s*\/?\s*\d*|(\bW\/\d+)|(\bPRE\/\d+)|"\s*[^"]+"\s*~\s*\d+|:\s*~\s*\d+/i;
+const PROX_RE = /\b(NEAR|NEXT|ONEAR|ADJ|SAME|AROUND)\s*\/?\s*\d*|(\bW\/\d+)|(\bPRE\/\d+)|"\s*[^"]+"\s*~\s*\d+|:\s*~\s*\d+|~\d+/i;
 const FIELD_RE = /(TITLE-ABS-KEY|TITLE|ABS|SUBJAREA|DOCTYPE|\[[a-z]{1,6}(:~\d+)?\]|\.(ti|ab|kf|mp)\b|\b(TS|TI|AU|SO|DO|PMID)=|DE\s*=|[a-z_.]+\s*:\s*["\w])/i;
 const MESH_RE = /(\[mesh(:noexp)?\]|\[majr\]|\[sh\]|\bexp\s+\S+\/|\*\S+\/)/i;
 
