@@ -1,8 +1,58 @@
-node_modules/
-dist/
-.turbo/
-.git/
-coverage/
-*.log
-.env*
-.vercel/
+# ============================================
+# Docker Build Context — Exclusion List
+# ============================================
+# Keep build contexts minimal for faster builds
+
+# Dependencies (rebuilt in container)
+node_modules
+**/node_modules
+
+# Build outputs (rebuilt in container)
+**/dist
+**/.next
+**/out
+
+# Development artifacts
+**/*.log
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Version control
+.git
+.gitignore
+
+# IDE/Editor
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/vitest.config.ts
+**/vitest.e2e.config.ts
+
+# Documentation
+**/*.md
+**/docs
+
+# Docker files (not needed in context)
+Dockerfile.*
+docker-compose.yml
+.dockerignore
+
+# Session state
+.opencode
+
+# Monorepo root files (not needed in builds)
+turbo.json
+pnpm-workspace.yaml

@@ -1,0 +1,85 @@
+# ============================================
+# Caddy Reverse Proxy — TLS + Rate Limiting
+# ============================================
+# Auto-provisions TLS via Let's Encrypt
+# Rate limits protect against abuse
+# Chunked streaming timeout extended for bulk exports
+
+{$DOMAIN:localhost} {
+    # Security headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        -Server
+    }
+
+    # Rate limiting
+    rate_limit {
+        zone static {
+            key {remote_host}
+            events 100
+            window 1m
+        }
+        zone api {
+            key {remote_host}
+            events 50
+            window 1m
+        }
+    }
+
+    # Client UI — Next.js
+    handle / {
+        reverse_proxy client:3000
+    }
+
+    # Static assets — bypass rate limiting
+    handle /_next/* {
+        reverse_proxy client:3000
+    }
+
+    handle /favicon.ico {
+        reverse_proxy client:3000
+    }
+
+    # API endpoints — Fastify
+    handle /api/* {
+        reverse_proxy api:3001 {
+            # Extended timeout for chunked streaming exports
+            transport http {
+                read_buffer  16384
+                write_buffer 16384
+                dial_timeout  10s
+                response_header_timeout 300s
+                read_timeout  300s
+                write_timeout 300s
+            }
+        }
+    }
+
+    # Health checks — no rate limit
+    handle /health {
+        reverse_proxy api:3001
+    }
+
+    # Default — 404
+    handle {
+        respond "Not Found" 404
+    }
+}
+
+# Localhost (no TLS) for development
+localhost {
+    reverse_proxy client:3000
+
+    handle /api/* {
+        reverse_proxy api:3001
+    }
+
+    handle /health {
+        reverse_proxy api:3001
+    }
+}

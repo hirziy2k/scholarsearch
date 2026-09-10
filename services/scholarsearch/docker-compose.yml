@@ -1,75 +1,155 @@
-version: "3.9"
+# ============================================
+# ScholarSearch v1.0.0 — Production Stack
+# ============================================
+# Caddy (TLS) → Next.js (UI) + Fastify (API)
+# Litestream sidecar → SQLite WAL streaming to S3
+
+version: "3.8"
 
 services:
-  postgres:
-    image: pgvector/pgvector:pg16
-    container_name: scholarsearch-postgres
+  # ============================================
+  # Caddy — TLS Termination + Reverse Proxy
+  # ============================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: scholarsearch-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: scholarsearch
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - DOMAIN=${DOMAIN:-localhost}
+    depends_on:
+      - api
+      - client
+    networks:
+      - frontend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
+      test: ["CMD", "wget", "-qO-", "http://localhost:2019/config/"]
+      interval: 30s
       timeout: 5s
-      retries: 5
+      retries: 3
+      start_period: 10s
 
-  redis:
-    image: redis:7-alpine
-    container_name: scholarsearch-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  backend:
+  # ============================================
+  # Fastify API — Clinical Evidence Pipeline
+  # ============================================
+  api:
     build:
       context: .
-      dockerfile: apps/server/Dockerfile
-    container_name: scholarsearch-backend
-    ports:
-      - "3001:3001"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/scholarsearch?schema=public
-      REDIS_URL: redis://redis:6379
-      NODE_ENV: development
-      PORT: 3001
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      dockerfile: Dockerfile.api
+    container_name: scholarsearch-api
+    restart: unless-stopped
+    expose:
+      - "3001"
     volumes:
-      - ./apps/server/src:/app/apps/server/src
-      - ./packages/shared/src:/app/packages/shared/src
-      - ./packages/mcp-sources/src:/app/packages/mcp-sources/src
-      - ./packages/omniroute/src:/app/packages/omniroute/src
-
-  frontend:
-    build:
-      context: .
-      dockerfile: apps/client/Dockerfile
-    container_name: scholarsearch-frontend
-    ports:
-      - "3000:3000"
+      - db_data:/data/db
+      - uploads_data:/data/uploads
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-    depends_on:
+      - NODE_ENV=production
+      - PORT=3001
+      - HOST=0.0.0.0
+      - DATABASE_URL=file:/data/db/scholarsearch.db
+      - LOG_LEVEL=info
+      - OPENALEX_EMAIL=${OPENALEX_EMAIL}
+      - SEMANTIC_SCHOLAR_API_KEY=${SEMANTIC_SCHOLAR_API_KEY}
+      - CROSSREF_API_KEY=${CROSSREF_API_KEY:-}
+      - CORE_API_KEY=${CORE_API_KEY:-}
+      - ERIC_API_KEY=${ERIC_API_KEY:-}
+      - SCOPUS_API_KEY=${SCOPUS_API_KEY:-}
+    networks:
+      - frontend
       - backend
-    volumes:
-      - ./apps/client/src:/app/apps/client/src
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
+  # ============================================
+  # Litestream — SQLite WAL Backup Sidecar
+  # ============================================
+  litestream:
+    image: litestream/litestream:latest
+    container_name: scholarsearch-litestream
+    restart: unless-stopped
+    depends_on:
+      - api
+    volumes:
+      - db_data:/data/db
+      - ./litestream.yml:/etc/litestream.yml:ro
+    environment:
+      - LITESTREAM_S3_BUCKET=${LITESTREAM_S3_BUCKET}
+      - LITESTREAM_S3_ENDPOINT=${LITESTREAM_S3_ENDPOINT}
+      - LITESTREAM_S3_ACCESS_KEY=${LITESTREAM_S3_ACCESS_KEY}
+      - LITESTREAM_S3_SECRET_KEY=${LITESTREAM_S3_SECRET_KEY}
+      - LITESTREAM_S3_REGION=${LITESTREAM_S3_REGION:-us-east-1}
+    networks:
+      - backend
+    # Litestream runs as replicate (streaming), not restore
+    command: replicate /etc/litestream.yml
+    healthcheck:
+      test: ["CMD", "litestream", "databases", "-config", "/etc/litestream.yml"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ============================================
+  # Next.js Client — Clinical Triage UI
+  # ============================================
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    container_name: scholarsearch-client
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - NEXT_PUBLIC_API_URL=http://api:3001
+    networks:
+      - frontend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+# ============================================
+# Named Volumes — Immutable Persistence
+# ============================================
 volumes:
-  postgres_data:
-  redis_data:
+  db_data:
+    name: scholarsearch_db
+    driver: local
+  uploads_data:
+    name: scholarsearch_uploads
+    driver: local
+  caddy_data:
+    name: scholarsearch_caddy_data
+    driver: local
+  caddy_config:
+    name: scholarsearch_caddy_config
+    driver: local
+
+# ============================================
+# Networks — Segmented Access
+# ============================================
+networks:
+  frontend:
+    name: scholarsearch_frontend
+    driver: bridge
+  backend:
+    name: scholarsearch_backend
+    driver: bridge
+    internal: true  # No external access to API/DB directly
