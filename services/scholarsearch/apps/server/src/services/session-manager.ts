@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from "uuid";
 
 const DEFAULT_PAGE_SIZE = 10;
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CURRENT_SCHEMA_VERSION = 2; // Hotfix: bumped from implicit 1 to quarantine zero-weight sessions
 
 export interface CreateSessionInput {
   rawQuery: string;
@@ -61,7 +62,12 @@ export async function createSession(input: CreateSessionInput) {
 
 export async function getSession(searchId: string) {
   const db = getDb();
-  return db.searchSession.findFirst({ where: { searchId } });
+  const session = await db.searchSession.findFirst({ where: { searchId } });
+  if (!session) return null;
+  if ((session.schemaVersion ?? 1) < CURRENT_SCHEMA_VERSION) {
+    return null; // Stale schema — quarantine poisoned zero-weight sessions
+  }
+  return session;
 }
 
 export async function getPages(searchId: string, source?: string) {
@@ -161,7 +167,10 @@ export async function cleanupExpiredSessions() {
   const db = getDb();
   const deleted = await db.searchSession.deleteMany({
     where: {
-      expiresAt: { lt: new Date() },
+      OR: [
+        { expiresAt: { lt: new Date() } },
+        { schemaVersion: { lt: CURRENT_SCHEMA_VERSION } },
+      ],
     },
   });
   return deleted.count;
