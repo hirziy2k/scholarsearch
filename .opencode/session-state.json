@@ -1,108 +1,53 @@
 {
-  "current_objective": "v1.0.0 baseline fully secured and pushed to origin",
+  "current_objective": "v1.0.0 baseline secured — hotfix merged, cleanup complete, all YELLOW items resolved",
   "modified_infrastructure": [
     {
-      "path": "services/scholarsearch/packages/shared/src/utils/native-syntax.ts",
-      "last_edit": "2026-09-10T04:17:22.476143+00:00",
-      "change_description": "Patched PROX_RE regex to catch bare ~N proximity operators"
+      "path": "services/scholarsearch/Dockerfile",
+      "last_edit": "2026-09-11T03:28:11.358734+00:00",
+      "change_description": "Injected npx prisma generate before turbo build"
     },
     {
-      "path": "services/scholarsearch/apps/server/prisma/schema.prisma",
-      "last_edit": "2026-09-10T15:17:36.115719+00:00",
-      "change_description": "SQLite schema with SearchPage, ProtocolUpload, ExportRecord"
+      "path": "services/scholarsearch/packages/shared/src/utils/ranking.ts",
+      "last_edit": "2026-09-11T03:28:15.863702+00:00",
+      "change_description": "Patched clinical and citation_verification weights from all-zeros to sum=1.00"
     },
     {
-      "path": "services/scholarsearch/apps/server/src/db.ts",
-      "last_edit": "2026-09-10T15:17:36.190598+00:00",
-      "change_description": "Database init with WAL mode and busy_timeout"
+      "path": "services/scholarsearch/apps/server/src/services/search-orchestrator.ts",
+      "last_edit": "2026-09-11T03:28:22.353941+00:00",
+      "change_description": "Changed local AST intersection from title-only to title+abstract"
     },
     {
       "path": "services/scholarsearch/apps/server/src/services/session-manager.ts",
-      "last_edit": "2026-09-10T15:17:36.260287+00:00",
-      "change_description": "Session CRUD and page storage"
+      "last_edit": "2026-09-11T03:28:22.872843+00:00",
+      "change_description": "Added schema v2 quarantine for poisoned zero-weight sessions"
     },
     {
-      "path": "services/scholarsearch/apps/server/src/routes/polling.ts",
-      "last_edit": "2026-09-10T15:17:36.328136+00:00",
-      "change_description": "Lazy-loaded polling endpoint"
+      "path": "services/scholarsearch/apps/server/prisma/schema.prisma",
+      "last_edit": "2026-09-11T03:28:23.480021+00:00",
+      "change_description": "Added schemaVersion Int field with default 2"
     },
     {
-      "path": "services/scholarsearch/apps/server/src/utils/fetch-mutex.ts",
-      "last_edit": "2026-09-10T15:17:36.394751+00:00",
-      "change_description": "In-memory fetch deduplication"
+      "path": "services/scholarsearch/apps/server/src/__tests__/correctness-integrity.test.ts",
+      "last_edit": "2026-09-11T03:28:24.036747+00:00",
+      "change_description": "New vitest regression suite for clinical weights and intersection recall"
     },
     {
-      "path": "services/scholarsearch/apps/server/src/utils/page-validation.ts",
-      "last_edit": "2026-09-10T15:17:36.461805+00:00",
-      "change_description": "Payload validation before ORM write"
+      "path": ".github/workflows/ci-scholarsearch.yml",
+      "last_edit": "2026-09-11T03:28:24.553788+00:00",
+      "change_description": "Added unit-tests job running vitest"
     },
     {
-      "path": "services/scholarsearch/apps/server/src/server.ts",
-      "last_edit": "2026-09-10T15:17:36.528815+00:00",
-      "change_description": "Wired up db init, polling routes, graceful shutdown"
-    },
-    {
-      "path": "services/scholarsearch/apps/server/src/services/metadata-verification.ts",
-      "last_edit": "2026-09-10T15:34:04.967668+00:00",
-      "change_description": "Trial registration regex extractor (NCT, ISRCTN, ACTRN, EUCTR, ChiCTR, IRCT, JPRN, CTRI, ReBEC)"
-    },
-    {
-      "path": "services/scholarsearch/apps/server/src/services/ctgov-verifier.ts",
-      "last_edit": "2026-09-10T15:34:05.043323+00:00",
-      "change_description": "CT.gov cross-reference with 5s timeout and circuit breaker"
-    },
-    {
-      "path": "services/scholarsearch/apps/server/src/services/geo-equity-override.ts",
-      "last_edit": "2026-09-10T15:34:05.108667+00:00",
-      "change_description": "Geopolitical equity weight inversion for ASEAN/East Asia"
-    },
-    {
-      "path": "services/scholarsearch/apps/server/src/routes/adjudication.ts",
-      "last_edit": "2026-09-10T15:34:05.177285+00:00",
-      "change_description": "Adjudication endpoint and verification summary"
-    },
-    {
-      "path": "services/scholarsearch/apps/server/src/server.ts",
-      "last_edit": "2026-09-10T15:34:05.244047+00:00",
-      "change_description": "Wired up adjudication routes"
-    },
-    {
-      "path": "services/scholarsearch/apps/server/src/services/protocol-verification.ts",
-      "last_edit": "2026-09-10T15:47:08.732264+00:00",
-      "change_description": "Protocol gate: 5 keywords + apex source declaration regex"
-    },
-    {
-      "path": "services/scholarsearch/apps/server/src/services/strict-translation.ts",
-      "last_edit": "2026-09-10T15:47:08.801994+00:00",
-      "change_description": "Parallel noun-phrase extraction from Boolean AST"
-    },
-    {
-      "path": "services/scholarsearch/apps/server/src/services/strict-dispatch.ts",
-      "last_edit": "2026-09-10T15:47:08.871282+00:00",
-      "change_description": "Strict dispatch orchestrator"
-    },
-    {
-      "path": "services/scholarsearch/apps/server/src/services/export-gate.ts",
-      "last_edit": "2026-09-10T15:47:08.936986+00:00",
-      "change_description": "Apex source lock with clinical brief downgrade"
-    },
-    {
-      "path": "services/scholarsearch/apps/server/src/routes/export.ts",
-      "last_edit": "2026-09-10T15:47:09.005478+00:00",
-      "change_description": "Export endpoint with gate check"
-    },
-    {
-      "path": "services/scholarsearch/apps/server/src/server.ts",
-      "last_edit": "2026-09-10T15:47:09.071951+00:00",
-      "change_description": "Wired up export routes"
+      "path": "README.md",
+      "last_edit": "2026-09-11T03:28:25.122000+00:00",
+      "change_description": "Fixed ScholarSearch stack description from PostgreSQL to SQLite"
     }
   ],
   "active_blockers": [],
   "next_action_trigger": "npm run build --workspace=services/scholarsearch",
   "meta": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-09-11T03:07:41.901239+00:00",
-    "session_count": 2,
-    "total_tokens_saved": 52000
+    "last_updated": "2026-09-11T03:28:30.438122+00:00",
+    "session_count": 0,
+    "total_tokens_saved": 0
   }
 }
