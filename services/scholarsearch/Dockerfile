@@ -9,15 +9,12 @@ COPY . .
 
 RUN npm ci
 
+# Generate Prisma client bindings — db.ts imports @prisma/client directly.
+RUN npx prisma generate
+
 # Build the server workspace and its workspace dependencies only.
 # turbo filter "..." suffix = "@scholarsearch/server plus everything it depends on".
 RUN npx turbo run build --filter=@scholarsearch/server...
-
-# NOTE: `prisma generate` is intentionally absent. No TypeScript file in
-# apps/server or packages/* imports @prisma/client, and prisma is in neither
-# dependencies, devDependencies, nor package-lock.json (schema.prisma is
-# currently dead schema). Wire `generate` plus a postgres service the day a
-# PrismaClient is actually instantiated.
 
 FROM node:20-slim AS runtime
 

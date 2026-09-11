@@ -53,6 +53,9 @@ model SearchSession {
   afterDeduplication  Int @default(0)
   durationMs          Int @default(0)
 
+  // Hotfix schema version — bumped to 2 to quarantine poisoned zero-weight sessions
+  schemaVersion Int      @default(2)
+
   // Model usage
   modelUsed     String?
   modelVersion  String?

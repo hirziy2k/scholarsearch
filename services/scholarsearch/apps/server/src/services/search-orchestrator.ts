@@ -628,11 +628,13 @@ export async function orchestrateSearch(
                 }
                 result.results_count = result.raw_results.length;
               } catch {
-                // Fallback: apply AST intersection on whatever we have
+                // Fallback: apply AST intersection on title + abstract
                 result.raw_results = result.raw_results.filter((paper: any) => {
                   let rawTitle = paper.title ?? paper.Title ?? "";
                   if (Array.isArray(rawTitle)) rawTitle = rawTitle[0] ?? "";
-                  return evaluateAST(originalAst, rawTitle);
+                  const rawAbstract = paper.abstract ?? paper.Abstract ?? "";
+                  const searchText = rawTitle + " " + rawAbstract;
+                  return evaluateAST(originalAst, searchText);
                 });
                 for (const paper of result.raw_results) {
                   paper._degradedPrecision = true;
@@ -642,12 +644,14 @@ export async function orchestrateSearch(
             }
           }
         } else {
-          // Standard local intersection: filter by AST evaluation
+          // Standard local intersection: filter by AST evaluation on title + abstract
           result.raw_results = result.raw_results.filter((paper: any) => {
             let rawTitle = paper.title ?? paper.Title ?? "";
             if (Array.isArray(rawTitle)) rawTitle = rawTitle[0] ?? "";
             if (typeof rawTitle !== "string") rawTitle = String(rawTitle ?? "");
-            return evaluateAST(originalAst, rawTitle);
+            const rawAbstract = paper.abstract ?? paper.Abstract ?? "";
+            const searchText = rawTitle + " " + rawAbstract;
+            return evaluateAST(originalAst, searchText);
           });
           // Tag as degraded precision — AND-unsafe source filtered locally
           for (const paper of result.raw_results) {
