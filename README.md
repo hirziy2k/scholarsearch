@@ -61,7 +61,7 @@ opencode
 ### ScholarSearch (`services/scholarsearch/`)
 PRISMA-compliant multi-source academic search engine.
 
-- **Stack:** TypeScript, Next.js 14, Fastify, Turborepo, Prisma, PostgreSQL
+- **Stack:** TypeScript, Next.js 14, Fastify, Turborepo, Prisma, SQLite
 - **Run:** `cd services/scholarsearch && npm install && npm run dev`
 
 ### Mendeley Patcher (`services/mendeley-patcher/`)
