@@ -9,10 +9,6 @@ Routes writing requests to the correct pipeline based on task scale. Prevents wo
 ```
 USER REQUEST
     │
-    ├── Is this a FIGURE/VISUALIZATION task?
-    │   └── YES → Route to: scientific-visualization
-    │             Constraint: SUPERVISED ONLY (human reviews output)
-    │
     ├── Is this EDITING EXISTING TEXT?
     │   │
     │   ├── Does it introduce NEW claims, data, or citations?
@@ -90,13 +86,6 @@ USER REQUEST
 - "Polish this abstract"
 - "Correct the terminology"
 - "Fix translation terminology" (e.g., "change X to keterlihatan")
-
-### → SCIENTIFIC-VISUALIZATION
-- "Create a figure/chart/graph"
-- "Make a publication-quality plot"
-- "Design a bar chart of..."
-- "Generate a figure for [journal]"
-- "Visualize this data"
 
 ## Operational Constraints
 

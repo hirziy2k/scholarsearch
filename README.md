@@ -12,12 +12,14 @@ A monorepo containing academic research tools orchestrated by an AI agent via Op
 ├── .opencode/
 │   ├── rules/                 # Agent behavior rules
 │   │   └── context-discipline.md
-│   ├── skills/                # Specialized agent skills
+│   ├── skills/                # Specialized agent skills (7 total)
 │   │   ├── session-state-tracker/
 │   │   ├── unified-engine-architecture/
 │   │   ├── day2-operations/
 │   │   ├── pdf2pptx-architecture/
-│   │   └── scholarsearch-architecture/
+│   │   ├── scholarsearch-architecture/
+│   │   ├── scientific-writing/   # Documentation-only guidance
+│   │   └── sciwrite/            # Documentation-only prose QA
 │   ├── engine/                # OmniRoute engine config
 │   │   └── model-aliases.json
 │   ├── swarm/                 # Swarm Cascade deep research engine
@@ -76,7 +78,7 @@ The OpenCode agent operates with:
 
 - **10 immutable rules** (context-discipline.md) enforcing token discipline
 - **Session state tracker** for cross-session memory (~120 tokens vs ~10,000 raw)
-- **5 specialized skills** for domain-specific tasks
+- **7 specialized skills** for domain-specific tasks (2 documentation-only)
 - **3 MCP servers** (pdf-tools, powerpoint, scholarsearch-sources) for tool access
 
 ## Configuration

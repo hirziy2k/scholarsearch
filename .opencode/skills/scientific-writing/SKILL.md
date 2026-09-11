@@ -1,6 +1,6 @@
 ---
 name: scientific-writing
-description: Draft, revise, and audit scientific manuscripts or reports with explicit evidence provenance, reporting-guideline coverage, authorship accountability, confidentiality controls, and local consistency checks. Use for manuscript sections, references, declarations, tables, figures, or submission preparation when scientific accuracy and traceability matter.
+description: Documentation-only guidance for scientific manuscript drafting, revision, and auditing. Covers evidence provenance, reporting-guideline coverage, authorship accountability, and consistency checks. No bundled scripts or templates — use as procedural reference only.
 license: MIT
 compatibility: Requires Python 3.11+ only for optional dependency-free local CLIs; core guidance is platform-neutral. Bundled tools are offline and require no API keys.
 metadata:

@@ -4,7 +4,7 @@ description: ScholarSearch academic literature search engine — PRISMA-complian
 license: MIT
 compatibility: opencode
 metadata:
-  tech-stack: Next.js 14, Fastify, TypeScript, Tailwind CSS, Serwist PWA, Prisma, PostgreSQL
+  tech-stack: Next.js 14, Fastify, TypeScript, Tailwind CSS, Serwist PWA, Prisma, SQLite
   sources: OpenAlex, PubMed, Semantic Scholar, Crossref, CORE, ERIC, DOAJ, Scopus
   llm: Anthropic Claude, OpenAI GPT-4o
 ---
