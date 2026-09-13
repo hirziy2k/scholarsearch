@@ -1,0 +1,71 @@
+# ============================================
+# ScholarSearch Client — Next.js Production Image
+# ============================================
+# Multi-stage build: install deps, build, run in minimal alpine
+
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache python3 make g++
+
+# Copy workspace root files
+COPY package.json package-lock.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/client/package.json apps/client/
+
+# Install all dependencies
+RUN npm ci --workspace=apps/client --workspace=packages/shared
+
+# Copy source code
+COPY packages/shared/ packages/shared/
+COPY apps/client/ apps/client/
+
+# Build shared package first
+RUN npm run build --workspace=packages/shared
+
+# Build Next.js client
+RUN npm run build --workspace=apps/client
+
+# ============================================
+# Production image
+# ============================================
+FROM node:20-alpine AS production
+
+RUN apk add --no-cache tini
+
+# Non-root user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+WORKDIR /app
+
+# Copy production artifacts
+COPY --from=builder /app/package.json /app/package-lock.json ./
+COPY --from=builder /app/packages/shared/package.json packages/shared/
+COPY --from=builder /app/packages/shared/dist packages/shared/dist/
+COPY --from=builder /app/apps/client/package.json apps/client/
+COPY --from=builder /app/apps/client/.next apps/client/.next/
+COPY --from=builder /app/apps/client/public apps/client/public/
+COPY --from=builder /app/apps/client/next.config.js apps/client/
+COPY --from=builder /app/apps/client/node_modules apps/client/node_modules/
+COPY --from=builder /app/node_modules ./node_modules/
+
+# Set ownership
+RUN chown -R appuser:appgroup /app
+
+# Environment defaults
+ENV NODE_ENV=production
+ENV PORT=3000
+
+USER appuser
+
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:3000/ || exit 1
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "apps/client/node_modules/next/dist/bin/next", "start", "-p", "3000"]

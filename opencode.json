@@ -1,0 +1,36 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [".opencode/rules/*.md"],
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 10000
+  },
+  "snapshot": true,
+  "autoupdate": "notify",
+  "share": "disabled",
+  "permission": {
+    "read": {
+      "*.key": "deny",
+      "*.pem": "deny",
+      "id_rsa*": "deny",
+      "id_ed25519*": "deny",
+      ".aws/credentials": "deny",
+      ".aws/**": "deny",
+      ".gcloud/**": "deny",
+      ".ssh/**": "deny",
+      ".gnupg/**": "deny",
+      "**/.env": "deny",
+      "**/.env.*": "deny"
+    },
+    "edit": {
+      "opencode.json": "deny"
+    }
+  },
+  "mcp": {
+    "scholarsearch-sources": {
+      "type": "local",
+      "command": ["node", "packages/mcp-sources/dist/mcp-server.js"]
+    }
+  }
+}

@@ -1,0 +1,43 @@
+interactions:
+- request:
+    body: '{"raw_query":"machine_learning"}'
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '32'
+      content-type:
+      - application/json
+      host:
+      - localhost:3001
+      user-agent:
+      - python-httpx/0.28.1
+    method: POST
+    uri: http://localhost:3001/api/search/sync
+  response:
+    body:
+      string: "{\"searchId\":\"2891fcfb-18f6-48a5-b5ff-47ab5cbaab04\",\"totalRaw\":0,\"totalDeduplicated\":0,\"duplicatesRemoved\":0,\"entityBlockedCount\":0,\"durationMs\":6920,\"shadowMergeCount\":0,\"shadowMergeFlags\":[],\"degradedSources\":[],\"frozenWeights\":{},\"weightsFrozenAt\":1789008792377,\"needsLocalIntersection\":false,\"cardinalityPivot\":false,\"andUnsafeSources\":[],\"compiledQueries\":{\"openalex\":\"machine_learning\",\"semantic_scholar\":\"machine_learning\",\"crossref\":\"\\\"machine_learning\\\"\",\"core\":\"\\\"machine_learning\\\"\",\"eric\":\"\\\"machine_learning\\\"\",\"doaj\":\"\\\"machine_learning\\\"\",\"scopus\":\"\\\"machine_learning\\\"\"},\"tierClassifications\":[],\"queryVersionHash\":{\"hash\":\"cdeed609be68d75281c1444728eb646c1318729e9b51f90d6d17b942c05971d3\",\"timestamp\":\"2026-09-10T02:53:12.378Z\",\"astFingerprint\":\"{type:str:4,value:str:16}\",\"endpoints\":[\"core\",\"crossref\",\"doaj\",\"eric\",\"openalex\",\"scopus\",\"semantic_scholar\"],\"region\":\"US\",\"description\":\"Query:
+        core+crossref+doaj+eric+openalex+scopus+semantic_scholar @ US | 0 results
+        | AST: {type:str:4,valu...\"},\"gapAnalysis\":{\"hasGaps\":false,\"gaps\":[],\"evidenceQuality\":0,\"bannerText\":\"Evidence
+        quality: 0% \u2014 0 results analyzed.\",\"globalAuditTrail\":{\"queryParameters\":[\"machine_learning\",\"machine_learning\",\"machine_learning\",\"\\\"machine_learning\\\"\",\"\\\"machine_learning\\\"\",\"\\\"machine_learning\\\"\",\"\\\"machine_learning\\\"\",\"\\\"machine_learning\\\"\"],\"sourcesQueried\":[\"openalex\",\"semantic_scholar\",\"crossref\",\"core\",\"eric\",\"doaj\",\"scopus\"],\"taxonomyNodesChecked\":[],\"tierDistribution\":{},\"totalResultsAnalyzed\":0,\"analyzedAt\":\"2026-09-10T02:53:12.378Z\"}},\"compact\":false,\"results\":[]}"
+    headers:
+      access-control-allow-origin:
+      - http://localhost:3000
+      connection:
+      - keep-alive
+      content-length:
+      - '1580'
+      content-type:
+      - application/json; charset=utf-8
+      date:
+      - Thu, 10 Sep 2026 02:53:12 GMT
+      keep-alive:
+      - timeout=72
+    status:
+      code: 200
+      message: OK
+version: 1

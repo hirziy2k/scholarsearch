@@ -1,0 +1,43 @@
+interactions:
+- request:
+    body: '{"raw_query":"CRISPR_gene_editing"}'
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-length:
+      - '35'
+      content-type:
+      - application/json
+      host:
+      - localhost:3001
+      user-agent:
+      - python-httpx/0.28.1
+    method: POST
+    uri: http://localhost:3001/api/search/sync
+  response:
+    body:
+      string: "{\"searchId\":\"974fb6fb-79b4-4cdc-b8a2-bfc90b892bdc\",\"totalRaw\":0,\"totalDeduplicated\":0,\"duplicatesRemoved\":0,\"entityBlockedCount\":0,\"durationMs\":1355,\"shadowMergeCount\":0,\"shadowMergeFlags\":[],\"degradedSources\":[],\"frozenWeights\":{},\"weightsFrozenAt\":1789008793753,\"needsLocalIntersection\":false,\"cardinalityPivot\":false,\"andUnsafeSources\":[],\"compiledQueries\":{\"openalex\":\"CRISPR_gene_editing\",\"semantic_scholar\":\"CRISPR_gene_editing\",\"crossref\":\"\\\"CRISPR_gene_editing\\\"\",\"core\":\"\\\"CRISPR_gene_editing\\\"\",\"eric\":\"\\\"CRISPR_gene_editing\\\"\",\"doaj\":\"\\\"CRISPR_gene_editing\\\"\",\"scopus\":\"\\\"CRISPR_gene_editing\\\"\"},\"tierClassifications\":[],\"queryVersionHash\":{\"hash\":\"38264e5f97f1b08532b7160fca5a45efaec0622e00449cbed5ce98eef8632841\",\"timestamp\":\"2026-09-10T02:53:13.753Z\",\"astFingerprint\":\"{type:str:4,value:str:19}\",\"endpoints\":[\"core\",\"crossref\",\"doaj\",\"eric\",\"openalex\",\"scopus\",\"semantic_scholar\"],\"region\":\"US\",\"description\":\"Query:
+        core+crossref+doaj+eric+openalex+scopus+semantic_scholar @ US | 0 results
+        | AST: {type:str:4,valu...\"},\"gapAnalysis\":{\"hasGaps\":false,\"gaps\":[],\"evidenceQuality\":0,\"bannerText\":\"Evidence
+        quality: 0% \u2014 0 results analyzed.\",\"globalAuditTrail\":{\"queryParameters\":[\"CRISPR_gene_editing\",\"CRISPR_gene_editing\",\"CRISPR_gene_editing\",\"\\\"CRISPR_gene_editing\\\"\",\"\\\"CRISPR_gene_editing\\\"\",\"\\\"CRISPR_gene_editing\\\"\",\"\\\"CRISPR_gene_editing\\\"\",\"\\\"CRISPR_gene_editing\\\"\"],\"sourcesQueried\":[\"openalex\",\"semantic_scholar\",\"crossref\",\"core\",\"eric\",\"doaj\",\"scopus\"],\"taxonomyNodesChecked\":[],\"tierDistribution\":{},\"totalResultsAnalyzed\":0,\"analyzedAt\":\"2026-09-10T02:53:13.753Z\"}},\"compact\":false,\"results\":[]}"
+    headers:
+      access-control-allow-origin:
+      - http://localhost:3000
+      connection:
+      - keep-alive
+      content-length:
+      - '1625'
+      content-type:
+      - application/json; charset=utf-8
+      date:
+      - Thu, 10 Sep 2026 02:53:13 GMT
+      keep-alive:
+      - timeout=72
+    status:
+      code: 200
+      message: OK
+version: 1

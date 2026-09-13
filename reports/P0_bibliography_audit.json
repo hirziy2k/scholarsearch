@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "description": "P0 Bibliography Audit Trail — scoping review citation verification",
+  "protocol_version": "v7.6",
+  "entries": [
+    {
+      "citation": "NICE. (2023). Dry eye disease. Clinical Knowledge Summary. https://cks.nice.org.uk/topics/dry-eye-disease/",
+      "status": "confirmed_real",
+      "verified_via": [
+        "websearch_snippets",
+        "Perplexity_compilation"
+      ],
+      "key_facts": "Last revised January 2023, title changed from 'Dry eye syndrome' to 'Dry eye disease'"
+    }
+  ]
+}

@@ -1,0 +1,243 @@
+// ScholarSearch Prisma Schema (SQLite)
+// All JSON fields stored as TEXT. Serialization handled in application code.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Search Sessions
+// ============================================
+
+model SearchSession {
+  id            String   @id @default(uuid())
+  searchId      String   @unique // External-facing UUID for API clients
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Query details
+  rawQuery      String
+  expandedQuery String?  // JSON: ExpandedQuery
+  mode          String   // SearchMode enum value
+  filters       String?  // JSON: SearchFilters
+  weights       String?  // JSON: RankingWeights
+  region        String?
+
+  // Pipeline status
+  status        String   @default("partial") // partial | complete | failed
+  methodology   String?  // systematic | exploratory
+
+  // Protocol verification (systematic_review mode)
+  protocolHash  String?  // SHA-256 of extracted protocol text
+  protocolFile  String?  // Path to uploaded protocol PDF
+  protocolValid Boolean? // Whether protocol passed keyword verification
+  protocolKeywordCount Int? // How many of 5 keywords matched
+
+  // Source tracking
+  sourceStatuses String  @default("[]") // JSON array of {source, status, resultCount, error}
+
+  // Pagination
+  totalPages    Int      @default(0)
+  fetchedPages  Int      @default(0)
+
+  // TTL for cleanup
+  expiresAt     DateTime?
+
+  // Statistics
+  totalRawResults     Int @default(0)
+  afterDeduplication  Int @default(0)
+  durationMs          Int @default(0)
+
+  // Hotfix schema version — bumped to 2 to quarantine poisoned zero-weight sessions
+  schemaVersion Int      @default(2)
+
+  // Model usage
+  modelUsed     String?
+  modelVersion  String?
+
+  // Relations
+  results       SearchResult[]
+  pages         SearchPage[]
+  savedPapers   SavedPaper[]
+  exports       ExportRecord[]
+  protocols     ProtocolUpload[]
+}
+
+// ============================================
+// Paginated API Pages (Immutable Append-Only)
+// ============================================
+
+model SearchPage {
+  id            String   @id @default(uuid())
+  sessionId     String
+  session       SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  source        String
+  pageNumber    Int
+  rawResults    String   // JSON array of raw paper objects
+  hitCount      Int      @default(0)
+  fetchedAt     DateTime @default(now())
+
+  @@unique([sessionId, source, pageNumber])
+  @@index([sessionId])
+}
+
+// ============================================
+// Protocol Uploads
+// ============================================
+
+model ProtocolUpload {
+  id            String   @id @default(uuid())
+  sessionId     String
+  session       SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  fileName      String
+  filePath      String
+  textHash      String   // SHA-256 of extracted text
+  rawFileHash   String   // SHA-256 of raw bytes
+  extractedText String?  // First 5000 chars (audit trail)
+  keywordCount  Int
+  valid         Boolean
+  warnings      String   @default("[]") // JSON array of warning strings
+
+  createdAt     DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([textHash])
+}
+
+// ============================================
+// Export Records
+// ============================================
+
+model ExportRecord {
+  id            String   @id @default(uuid())
+  sessionId     String
+  session       SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  format        String   // ris | csv | json
+  status        String   @default("pending") // pending | compiling | complete | blocked
+  blockedReason String?
+  watermarked   Boolean  @default(false)
+  watermarkText String?
+  filePath      String?
+  resultCount   Int      @default(0)
+
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+
+  @@index([sessionId])
+}
+
+// ============================================
+// Search Results (Cached)
+// ============================================
+
+model SearchResult {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+
+  sessionId     String
+  session       SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  dedupHash     String   @unique
+  openalexId    String?
+  semanticScholarId String?
+  pubmedId      String?
+  pmcid         String?
+  doi           String?
+  arxivId       String?
+
+  title         String
+  authors       String   // JSON array of Author
+  year          Int
+  journalName   String?
+  journalIssn   String?
+  publisher     String?
+  abstract      String?
+  keywords      String   @default("[]") // JSON array of strings
+  meshTerms     String   @default("[]") // JSON array of strings
+  concepts      String   @default("[]") // JSON array of {name, score}
+
+  publicationType String
+  studyDesign   String?
+  peerReviewStatus String // JSON: PeerReviewStatus
+  language      String?
+  country       String?
+
+  citationCount String?  // JSON: CitationCount
+  journalMetrics String? // JSON: JournalMetrics
+
+  openAccessStatus String // JSON: OpenAccessStatus
+  fullTextUrl   String?
+
+  retractionStatus String // JSON: RetractionStatus
+
+  rankingScores String   // JSON: RankingScores
+  picoAlignment String?  // JSON: PICOAlignment
+
+  sourceDatabases String // JSON array of source names
+  provenance     String  // JSON: Provenance
+
+  relevanceExplanation String?
+
+  @@index([sessionId])
+  @@index([doi])
+  @@index([year])
+  @@index([publicationType])
+}
+
+// ============================================
+// Saved Papers
+// ============================================
+
+model SavedPaper {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  userId        String   @default("anonymous")
+
+  sessionId     String?
+  session       SearchSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  dedupHash     String
+  title         String
+  doi           String?
+  year          Int
+  journalName   String?
+  authors       String   // JSON array of Author
+  abstract      String?
+
+  tags          String   @default("[]") // JSON array of strings
+  notes         String?
+  readStatus    String   @default("unread")
+  rating        Int?
+
+  @@index([userId])
+  @@index([dedupHash])
+}
+
+// ============================================
+// Audit Log
+// ============================================
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+
+  action        String
+  details       String   // JSON
+  source        String?
+  durationMs    Int?
+  success       Boolean  @default(true)
+  error         String?
+
+  @@index([createdAt])
+  @@index([action])
+}

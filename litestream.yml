@@ -1,0 +1,43 @@
+# ============================================
+# Litestream — SQLite WAL Streaming to S3
+# ============================================
+# Streams WAL frames every 1s to offsite S3-compatible bucket
+# Zero-overhead async replication for disaster recovery
+
+# Source database
+db-path: /data/db/scholarsearch.db
+
+# S3-compatible replica
+replicas:
+  - type: s3
+    bucket: ${LITESTREAM_S3_BUCKET}
+    path: scholarsearch/db
+    endpoint: ${LITESTREAM_S3_ENDPOINT}
+    force-path-style: true
+    access-key-id: ${LITESTREAM_S3_ACCESS_KEY}
+    secret-access-key: ${LITESTREAM_S3_SECRET_KEY}
+    region: ${LITESTREAM_S3_REGION:-us-east-1}
+
+    # Sync interval: 1 second (near-zero RPO)
+    sync-interval: 1s
+
+    # Retention: 7 days of point-in-time recovery
+    retention: 168h
+
+    # Snapshot interval: every 6 hours
+    snapshot-interval: 6h
+
+    # Page size for WAL frame batching
+    page-size: 4096
+
+    # Max WAL frame queue before blocking
+    max-frame-buffer: 10000
+
+# Monitoring
+monitor-interval: 10s
+
+# Restore command (for disaster recovery):
+# docker run --rm -v scholarsearch_db:/data/db \
+#   litestream/litestream restore \
+#   -o /data/db/scholarsearch.db \
+#   s3://bucket/scholarsearch/db

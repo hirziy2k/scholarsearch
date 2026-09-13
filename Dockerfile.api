@@ -1,0 +1,80 @@
+# ============================================
+# ScholarSearch API — Fastify Production Image
+# ============================================
+# Multi-stage build: build dependencies in node, run in distroless-style alpine
+# Non-root user (node) for container escape mitigation
+
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install build dependencies for native modules (prisma, bcrypt)
+RUN apk add --no-cache python3 make g++
+
+# Copy workspace root files
+COPY package.json package-lock.json ./
+COPY packages/shared/package.json packages/shared/
+COPY packages/mcp-sources/package.json packages/mcp-sources/
+COPY apps/server/package.json apps/server/
+
+# Install all dependencies (workspace hoisting)
+RUN npm ci --workspace=apps/server --workspace=packages/shared --workspace=packages/mcp-sources
+
+# Copy source code
+COPY packages/shared/ packages/shared/
+COPY packages/mcp-sources/ packages/mcp-sources/
+COPY apps/server/ apps/server/
+
+# Generate Prisma client
+RUN cd apps/server && npx prisma generate
+
+# Build TypeScript
+RUN npm run build --workspace=packages/shared
+RUN npm run build --workspace=apps/server
+
+# ============================================
+# Production image — minimal attack surface
+# ============================================
+FROM node:20-alpine AS production
+
+# Security: add tini for proper signal handling
+RUN apk add --no-cache tini
+
+# Non-root user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+WORKDIR /app
+
+# Copy only production artifacts
+COPY --from=builder /app/package.json /app/package-lock.json ./
+COPY --from=builder /app/packages/shared/package.json packages/shared/
+COPY --from=builder /app/packages/shared/dist packages/shared/dist/
+COPY --from=builder /app/packages/mcp-sources/package.json packages/mcp-sources/
+COPY --from=builder /app/packages/mcp-sources/dist packages/mcp-sources/dist/
+COPY --from=builder /app/apps/server/package.json apps/server/
+COPY --from=builder /app/apps/server/dist apps/server/dist/
+COPY --from=builder /app/apps/server/node_modules apps/server/node_modules/
+COPY --from=builder /app/apps/server/prisma apps/server/prisma/
+COPY --from=builder /app/node_modules ./node_modules/
+
+# Create directories for persistent data
+RUN mkdir -p /data/db /data/uploads && \
+    chown -R appuser:appgroup /data /app
+
+# Environment defaults
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV HOST=0.0.0.0
+ENV DATABASE_URL="file:/data/db/scholarsearch.db"
+
+USER appuser
+
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:3001/health || exit 1
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "apps/server/dist/server.js"]
