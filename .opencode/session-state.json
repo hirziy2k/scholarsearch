@@ -1,38 +1,38 @@
 {
-  "current_objective": "Implement three simplification frameworks to replace 9-layer complexity",
+  "current_objective": "Implement three hardening frameworks for real-world failure states",
   "modified_infrastructure": [
     {
-      "path": "fhe_pipeline.py",
+      "path": "zk_proofs.py",
       "last_edit": "2026-09-13T00:00:00.000000+00:00",
-      "change_description": "FHE Pipeline: Encrypt data before compute layer"
+      "change_description": "ZK State Proofs for FHE integrity verification"
     },
     {
-      "path": "smpc_sharding.py",
+      "path": "threshold_signatures.py",
       "last_edit": "2026-09-13T00:00:00.000000+00:00",
-      "change_description": "SMPC Sharding: Split key across 3 environments"
+      "change_description": "3-of-5 threshold signatures + OTP stream sync"
     },
     {
-      "path": "ephemeral_otp.py",
+      "path": "sdr_entropy.py",
       "last_edit": "2026-09-13T00:00:00.000000+00:00",
-      "change_description": "Ephemeral OTP: Perfect secrecy with hardware TRNG"
+      "change_description": "SDR atmospheric noise entropy source"
     },
     {
-      "path": "simplified_zero_trust.py",
+      "path": "tradeoff_simulator.py",
       "last_edit": "2026-09-13T00:00:00.000000+00:00",
-      "change_description": "Simplified zero-trust combining all three primitives"
+      "change_description": "Interactive trade-off simulator"
     },
     {
-      "path": "SIMPLIFICATION_FRAMEWORKS.md",
+      "path": "HARDENING_FRAMEWORKS.md",
       "last_edit": "2026-09-13T00:00:00.000000+00:00",
-      "change_description": "Complete documentation for simplification frameworks"
+      "change_description": "Complete documentation for hardening frameworks"
     }
   ],
   "active_blockers": [],
-  "next_action_trigger": "Run `python simplified_zero_trust.py` to test the simplified system",
+  "next_action_trigger": "Run `python tradeoff_simulator.py` to test the interactive simulator",
   "meta": {
     "schema_version": "1.0.0",
     "last_updated": "2026-09-13T00:00:00.000000+00:00",
-    "session_count": 5,
-    "total_tokens_saved": 30000
+    "session_count": 6,
+    "total_tokens_saved": 35000
   }
 }
