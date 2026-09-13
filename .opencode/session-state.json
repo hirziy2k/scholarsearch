@@ -1,38 +1,38 @@
 {
-  "current_objective": "Implement three frameworks to solve register isolation gap",
+  "current_objective": "Implement three simplification frameworks to replace 9-layer complexity",
   "modified_infrastructure": [
     {
-      "path": "whitebox_aes.py",
+      "path": "fhe_pipeline.py",
       "last_edit": "2026-09-13T00:00:00.000000+00:00",
-      "change_description": "White-Box AES: Key fused into 8MB lookup tables"
+      "change_description": "FHE Pipeline: Encrypt data before compute layer"
     },
     {
-      "path": "metamorphic_engine.py",
+      "path": "smpc_sharding.py",
       "last_edit": "2026-09-13T00:00:00.000000+00:00",
-      "change_description": "JIT Metamorphic Engine with thermal masking"
+      "change_description": "SMPC Sharding: Split key across 3 environments"
     },
     {
-      "path": "tsx_protection.py",
+      "path": "ephemeral_otp.py",
       "last_edit": "2026-09-13T00:00:00.000000+00:00",
-      "change_description": "TSX Transactional Abort wrapper + C template"
+      "change_description": "Ephemeral OTP: Perfect secrecy with hardware TRNG"
     },
     {
-      "path": "THREE_FRAMEWORKS.md",
+      "path": "simplified_zero_trust.py",
       "last_edit": "2026-09-13T00:00:00.000000+00:00",
-      "change_description": "Complete documentation for three frameworks"
+      "change_description": "Simplified zero-trust combining all three primitives"
     },
     {
-      "path": "unified_zero_trust.py",
+      "path": "SIMPLIFICATION_FRAMEWORKS.md",
       "last_edit": "2026-09-13T00:00:00.000000+00:00",
-      "change_description": "Updated with White-Box, Metamorphic, and TSX"
+      "change_description": "Complete documentation for simplification frameworks"
     }
   ],
   "active_blockers": [],
-  "next_action_trigger": "Run `python unified_zero_trust.py` to test all six frameworks",
+  "next_action_trigger": "Run `python simplified_zero_trust.py` to test the simplified system",
   "meta": {
     "schema_version": "1.0.0",
     "last_updated": "2026-09-13T00:00:00.000000+00:00",
-    "session_count": 4,
-    "total_tokens_saved": 25000
+    "session_count": 5,
+    "total_tokens_saved": 30000
   }
 }
