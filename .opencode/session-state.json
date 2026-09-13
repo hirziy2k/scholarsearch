@@ -1,0 +1,38 @@
+{
+  "current_objective": "ScholarSearch standalone migration complete - engine promoted to repo root, verified, committed, pushed to origin/standalone-import",
+  "modified_infrastructure": [
+    {
+      "path": "PROVENANCE.md",
+      "last_edit": "2026-09-13T00:00:00.000000+00:00",
+      "change_description": "Migration record: origin, layout, adaptations, db.ts fix, exclusions"
+    },
+    {
+      "path": "apps/server/src/db.ts",
+      "last_edit": "2026-09-13T00:00:00.000000+00:00",
+      "change_description": "PRAGMAs via queryRawUnsafe; fixes P2010 startup crash on fresh builds"
+    },
+    {
+      "path": ".github/workflows/ci-scholarsearch.yml",
+      "last_edit": "2026-09-13T00:00:00.000000+00:00",
+      "change_description": "Removed monorepo paths filter; paths adapted to repo root"
+    },
+    {
+      "path": "opencode.json",
+      "last_edit": "2026-09-13T00:00:00.000000+00:00",
+      "change_description": "New minimal config: scholarsearch-sources MCP at packages/mcp-sources, credential-deny guards preserved"
+    },
+    {
+      "path": ".opencode/skills/session-state-tracker/",
+      "last_edit": "2026-09-13T00:00:00.000000+00:00",
+      "change_description": "Migrated session-state-tracker skill (SKILL.md, state_tracker.py, validate_state.py), hash-verified from legacy"
+    }
+  ],
+  "active_blockers": [],
+  "next_action_trigger": "Review/open PR from origin/standalone-import; recreate .env from .env.example at deploy time",
+  "meta": {
+    "schema_version": "1.0.0",
+    "last_updated": "2026-09-13T00:00:00.000000+00:00",
+    "session_count": 1,
+    "total_tokens_saved": 0
+  }
+}
