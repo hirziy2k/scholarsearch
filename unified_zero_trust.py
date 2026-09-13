@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 """
 Unified Zero-Trust Architecture
-Combines all three frameworks:
+Combines all six frameworks:
 1. Deceptive Immunologist: Decoys + Honey-tokens
 2. Behavioral Economist: Continuous verification + Key decay
 3. Microarchitectural Physicist: Register-bound notes (C extension)
+4. OS-Scheduler Realist: TSX Transactional Abort
+5. Chaos Engine Compiler: JIT Metamorphic Execution
+6. Cryptographic Alchemist: White-Box AES
 
 Usage:
     from unified_zero_trust import create_secure_environment
     
     with create_secure_environment() as env:
+        # Encrypt with all layers
+        ciphertext = env.secure_encrypt(plaintext)
+        
+        # Or get key for direct use
         key = env.get_master_key()
         if env.is_session_valid():
             do_secure_work()
@@ -31,6 +38,9 @@ from contextlib import contextmanager
 from decoy_defense import DeceptiveDefenseSystem, DecoyProcess
 from continuous_verification import SessionGuardian, secure_session
 from key_decay import SessionWithDecay, CryptographicBreathing
+from whitebox_aes import WhiteBoxAES, MetamorphicWhiteBox
+from metamorphic_engine import MetamorphicAES
+from tsx_protection import TSXProtectionWrapper
 
 
 @dataclass
@@ -42,6 +52,9 @@ class ZeroTrustConfig:
     min_entropy: float = 0.1
     enable_tpm_binding: bool = True
     enable_fido2: bool = True
+    enable_whitebox: bool = True
+    enable_metamorphic: bool = True
+    enable_tsx: bool = True
 
 
 @dataclass
@@ -54,23 +67,42 @@ class SecurityState:
     key_entropy: float
     traps_triggered: int
     is_valid: bool
+    whitebox_active: bool
+    metamorphic_active: bool
+    tsx_available: bool
 
 
 class UnifiedZeroTrust:
     """
     Unified zero-trust security system.
     
-    Integrates all three security frameworks into a cohesive defense.
+    Integrates all six security frameworks into a cohesive defense.
     """
     
     def __init__(self, master_key: bytes, config: Optional[ZeroTrustConfig] = None):
         self.config = config or ZeroTrustConfig()
         self.master_key = master_key
         
-        # Initialize components
+        # Initialize components (Layers 1-6 from previous sessions)
         self.defense = DeceptiveDefenseSystem(master_key)
         self.guardian = SessionGuardian(master_key)
         self.decay_session = SessionWithDecay(master_key)
+        
+        # Initialize new frameworks (Layers 7-9)
+        if self.config.enable_whitebox:
+            self.whitebox = WhiteBoxAES(master_key[:16])
+        else:
+            self.whitebox = None
+        
+        if self.config.enable_metamorphic:
+            self.metamorphic = MetamorphicAES(master_key[:16])
+        else:
+            self.metamorphic = None
+        
+        if self.config.enable_tsx:
+            self.tsx = TSXProtectionWrapper()
+        else:
+            self.tsx = None
         
         # State tracking
         self._session_id = secrets.token_hex(16)
@@ -217,7 +249,10 @@ class UnifiedZeroTrust:
             heartbeats_received=guardian_state.heartbeat_count,
             key_entropy=decay_info["breathing_entropy"],
             traps_triggered=self.defense.scorched_earth._trap_count,
-            is_valid=self.is_session_valid()
+            is_valid=self.is_session_valid(),
+            whitebox_active=self.whitebox is not None,
+            metamorphic_active=self.metamorphic is not None,
+            tsx_available=self.tsx.is_available() if self.tsx else False
         )
     
     def get_master_key(self) -> bytes:
@@ -226,6 +261,32 @@ class UnifiedZeroTrust:
             return None
         
         return self.defense.key_rotator.current_key
+    
+    def secure_encrypt(self, data: bytes) -> bytes:
+        """
+        Encrypt data using all available security layers.
+        
+        Uses white-box AES as primary, metamorphic for power masking,
+        and TSX for hardware protection.
+        """
+        if not self.is_session_valid():
+            raise RuntimeError("Session is not valid")
+        
+        result = data
+        
+        # Layer 1: White-Box AES (primary encryption)
+        if self.whitebox:
+            result = self.whitebox.encrypt(data)
+        
+        # Layer 2: Metamorphic (power signature masking)
+        if self.metamorphic:
+            self.metamorphic.execute(data)
+        
+        # Layer 3: TSX (hardware protection if available)
+        if self.tsx and self.tsx.is_available():
+            result = self.tsx.protected_execute(lambda x: x, result)
+        
+        return result
     
     def force_key_rotation(self):
         """Force immediate key rotation."""
@@ -321,13 +382,32 @@ if __name__ == "__main__":
         num_decoys=10,  # Reduced for testing
         heartbeat_interval_ms=100,
         key_half_life_s=30,  # Short for testing
-        min_entropy=0.1
+        min_entropy=0.1,
+        enable_whitebox=True,
+        enable_metamorphic=True,
+        enable_tsx=True
     )
     
     # Create secure environment
     print("\nCreating secure environment...")
     with create_secure_environment(config) as env:
         print(f"\nSession ID: {env._session_id}")
+        
+        # Check framework availability
+        print("\nFramework Status:")
+        print(f"  White-Box AES: {'Active' if env.whitebox else 'Inactive'}")
+        print(f"  Metamorphic Engine: {'Active' if env.metamorphic else 'Inactive'}")
+        print(f"  TSX Protection: {'Available' if env.tsx and env.tsx.is_available() else 'Unavailable'}")
+        
+        # Test secure encryption
+        print("\nTesting secure encryption...")
+        test_data = b"Sensitive data to protect"
+        try:
+            encrypted = env.secure_encrypt(test_data)
+            print(f"  Plaintext: {test_data.hex()[:32]}...")
+            print(f"  Ciphertext: {encrypted.hex()[:32]}...")
+        except Exception as e:
+            print(f"  Encryption error: {e}")
         
         # Monitor for a few seconds
         print("\nMonitoring session for 10 seconds...")
@@ -355,6 +435,9 @@ if __name__ == "__main__":
         print(f"  Heartbeats: {state.heartbeats_received}")
         print(f"  Key entropy: {state.key_entropy:.3f}")
         print(f"  Traps triggered: {state.traps_triggered}")
+        print(f"  White-Box AES: {state.whitebox_active}")
+        print(f"  Metamorphic Engine: {state.metamorphic_active}")
+        print(f"  TSX Available: {state.tsx_available}")
         
         # Test token validation
         print("\nTesting token validation...")
