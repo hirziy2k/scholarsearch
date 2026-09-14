@@ -30,7 +30,7 @@ dependencies = [
 
 [project.optional-dependencies]
 redis = ["redis[hiredis]>=5.1,<6"]
-aws = ["boto3>=1.35,<2"]
+aws = ["boto3>=1.43.92,<2"]
 dev = [
     "pytest>=8,<9",
     "pytest-cov>=5,<6",
