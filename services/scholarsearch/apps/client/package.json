@@ -13,7 +13,7 @@
     "@scholarsearch/shared": "*",
     "@serwist/next": "^9.5.12",
     "idb": "^8.0.3",
-    "next": "^14.2.0",
+    "next": "^16.3.4",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"
   },
