@@ -51,7 +51,7 @@ jobs:
 
       - name: Create blocking issue on critical drift only
         if: steps.drift.outputs.exit_code == '1'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const title = `[BLOCKED] Ingested field drift — cassettes invalidated`;

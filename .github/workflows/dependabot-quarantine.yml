@@ -25,7 +25,7 @@ jobs:
 
       - name: Resolve runtime dependency graph via native graph APIs
         id: deps
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -168,7 +168,7 @@ jobs:
             core.setOutput('node_runtime_deps', JSON.stringify(Object.keys(nodeRuntimeDeps)));
 
       - name: Deterministic health certificate verification
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -275,7 +275,7 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
       - name: Zero-trust runtime audit with transitive graph traversal
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const pr = context.payload.pull_request;
