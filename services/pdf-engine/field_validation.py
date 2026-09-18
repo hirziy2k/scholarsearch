@@ -71,26 +71,30 @@ ADJACENCY_LINE_FACTOR = 1.5  # neighbor within 1.5x line height counts as adjace
 
 
 def quarantine_value(value: str) -> Tuple[bool, str]:
-    """Homoglyph & PUA quarantine — the value grades itself, not the CMap.
+    """Homoglyph & PUA quarantine, scoped per whitespace-delimited token.
 
-    NFKC-normalize; any length/character shift or Private-Use (Co) codepoint
-    means the string is structurally hostile (homoglyph swap, PUA smuggling,
-    ligature games). Class B only. Fail-closed.
+    Rules: NFKC must be identity (no compat games); no Private-Use (Co);
+    letters within ONE token must share a single script (Latin 'a' + Cyrillic
+    'e' in one token is hostile). A fully non-Latin token elsewhere (Jawi
+    header, Chinese stamp) is legitimate context — matching decides it.
+    Class B only. Fail-closed.
     """
     if not isinstance(value, str):
         return False, f"{REJECT_HOSTILE_UNICODE}: non-string"
     norm = unicodedata.normalize("NFKC", value)
     if norm != value:
         return False, f"{REJECT_HOSTILE_UNICODE}: NFKC shift {value!r} -> {norm!r}"
-    for ch in value:
-        if unicodedata.category(ch) == "Co":
-            return False, f"{REJECT_HOSTILE_UNICODE}: private-use U+{ord(ch):04X}"
-        # Script mixing: NFKC-stable homoglyphs (Cyrillic/Greek lookalikes).
-        # Class B expects Latin letterforms — any non-Latin letter is hostile.
-        if unicodedata.category(ch).startswith("L"):
-            script = unicodedata.name(ch, "").split(" ")[0]
-            if script not in ("LATIN",):
-                return False, f"{REJECT_HOSTILE_UNICODE}: non-Latin {script} U+{ord(ch):04X}"
+    for token in value.split():
+        scripts = set()
+        for ch in token:
+            cat = unicodedata.category(ch)
+            if cat == "Co":
+                return False, f"{REJECT_HOSTILE_UNICODE}: private-use U+{ord(ch):04X}"
+            if cat.startswith("L"):
+                scripts.add(unicodedata.name(ch, "").split(" ")[0])
+        if len(scripts) > 1:
+            return False, (f"{REJECT_HOSTILE_UNICODE}: mixed scripts in token "
+                           f"{token!r} {sorted(scripts)}")
     return True, "ok"
 
 
@@ -261,15 +265,21 @@ def validate_class_b(field: Dict[str, Any], value: Any, source_text: str) -> Tup
 
 
 def _locate_run(value: str, words: List[Dict[str, Any]]) -> Optional[Tuple[float, float, float, float]]:
-    """Union bbox of the value's contiguous word run, or None if no run."""
+    """Union bbox of the value's token run. Matches at token level across the
+    word stream, so single-word multi-token values ('$1,234.56' -> 1 word, 3
+    tokens) locate as well as multi-word runs."""
     vt = _tokens(value)
-    n = len(vt)
-    if not n or not words:
+    if not vt or not words:
         return None
-    for i in range(len(words) - n + 1):
-        run_text = " ".join(w["text"] for w in words[i:i + n])
-        if _tokens(run_text) == vt:
-            run = words[i:i + n]
+    stream: List[Tuple[str, int]] = []
+    for wi, w in enumerate(words):
+        for t in _tokens(w["text"]):
+            stream.append((t, wi))
+    n = len(vt)
+    for i in range(len(stream) - n + 1):
+        if [t for t, _ in stream[i:i + n]] == vt:
+            idx = sorted({wi for _, wi in stream[i:i + n]})
+            run = [words[j] for j in idx]
             return (min(w["x0"] for w in run), min(w["y0"] for w in run),
                     max(w["x1"] for w in run), max(w["y1"] for w in run))
     return None
@@ -358,46 +368,75 @@ def validate_field(field: Dict[str, Any], value: Any, source_text: str = "",
         meta = (spans is not None and fonts is not None and words is not None)
         if strict_meta and not meta:
             return False, REJECT_METADATA_MISSING
-        ok, reason = validate_class_b(field, value, source_text)
-        if not ok:
-            return False, reason
         if not meta:
-            return True, "ok"
+            # no metadata: string match only, no pixel or boundary verdicts
+            return validate_class_b(field, value, source_text)
         bbox = _locate_run(value, words) or _locate_best_window(value, words)
-        if ftype in ("amount",):
-            # amounts skip spatial boundary (numeric runs adjoin currency/units
-            # on the same line by design); tripwire still applies below
-            pass
-        verdict, why = field_span_verdict(bbox, spans, fonts)
-        if verdict == "clean":
-            if ftype in ("proper_noun", "verbatim", "account_id", "alphanumeric_id"):
+        verdict, _why = field_span_verdict(bbox, spans, fonts)
+        if verdict == "fallback":
+            return _ocr_path(field, value, words, bbox, ocr_fn, ink_fn)
+        # clean spans: trust the layer for matching, then verify
+        bounded = ftype in ("proper_noun", "verbatim", "account_id", "alphanumeric_id")
+        ok, reason = validate_class_b(field, value, source_text)
+        if ok:
+            if bounded:
                 return check_spatial_boundary(value, words)
-            return True, "ok"
-        # tainted field bbox -> pixels, not the lying layer. First the ink
-        # probe on the NATIVE run bbox (unexpanded: the model claims nothing
-        # follows the run, so any ink there refutes it without trusting OCR).
-        run = _locate_run(value, words)
-        if ink_fn is not None and run is not None:
-            try:
-                if ink_fn(run, _line_reach(words, run)):
-                    return False, f"{REJECT_TRUNCATION}: pixel continuation past run"
-            except Exception:
-                pass
+            return True, "ok"  # amounts: exact match + clean spans suffice
+        # clean layer but mismatch: focal raster fallback decides — a poisoned
+        # layer must never cast the deciding vote against a true extraction.
         if ocr_fn is None:
-            return False, REJECT_OCR_UNAVAILABLE
+            return False, reason
+        focal = _expand_to_line(bbox, words) if bbox else None
+        if focal is None:
+            return False, reason
         try:
-            clip = _expand_to_line(bbox, words) if bbox else (0, 0, 0, 0)
-            ocr_text, ocr_words = ocr_fn(clip)
+            ocr_text, ocr_words = ocr_fn(focal)
         except Exception as e:
             return False, f"{REJECT_OCR_UNAVAILABLE}: {e}"
-        ok, reason = quarantine_value(ocr_text)
-        if not ok:
-            return False, reason
-        ok, reason = validate_class_b(field, value, ocr_text)
-        if not ok:
-            return False, reason + " [via OCR]"
-        if ftype in ("proper_noun", "verbatim", "account_id", "alphanumeric_id"):
-            ok, reason = check_spatial_boundary(value, ocr_words)
-            return (ok, reason + " [via OCR]") if not ok else (True, "ok [via OCR]")
-        return True, "ok [via OCR]"
+        ok2, reason2 = quarantine_value(ocr_text)
+        if not ok2:
+            return False, reason2
+        ok2, reason2 = validate_class_b(field, value, ocr_text)
+        if not ok2:
+            return False, reason + f" + focal OCR confirms: {reason2}"
+        if bounded:
+            ok2, reason2 = check_spatial_boundary(value, ocr_words)
+            if not ok2:
+                return False, reason2 + " [focal OCR]"
+        return True, "ok [focal OCR, layer-degraded]"
     return False, f"unregistered field type: {ftype} -> {REJECT_METADATA_MISSING}"
+
+
+def _ocr_path(field: Dict[str, Any], value: str, words: List[Dict[str, Any]],
+              bbox: Optional[Tuple[float, float, float, float]],
+              ocr_fn: Optional[Callable[[Tuple[float, float, float, float]],
+                                        Tuple[str, List[Dict[str, Any]]]]],
+              ink_fn: Optional[Callable[[Tuple[float, float, float, float], float], bool]]
+              ) -> Tuple[bool, str]:
+    """Tainted-field pixel path: ink probe first, then OCR re-verdict."""
+    ftype = field["type"]
+    bounded = ftype in ("proper_noun", "verbatim", "account_id", "alphanumeric_id")
+    run = _locate_run(value, words)
+    if ink_fn is not None and run is not None:
+        try:
+            if ink_fn(run, _line_reach(words, run)):
+                return False, f"{REJECT_TRUNCATION}: pixel continuation past run"
+        except Exception:
+            pass
+    if ocr_fn is None:
+        return False, REJECT_OCR_UNAVAILABLE
+    try:
+        clip = _expand_to_line(bbox, words) if bbox else (0, 0, 0, 0)
+        ocr_text, ocr_words = ocr_fn(clip)
+    except Exception as e:
+        return False, f"{REJECT_OCR_UNAVAILABLE}: {e}"
+    ok, reason = quarantine_value(ocr_text)
+    if not ok:
+        return False, reason
+    ok, reason = validate_class_b(field, value, ocr_text)
+    if not ok:
+        return False, reason + " [via OCR]"
+    if bounded:
+        ok, reason = check_spatial_boundary(value, ocr_words)
+        return (ok, reason + " [via OCR]") if not ok else (True, "ok [via OCR]")
+    return True, "ok [via OCR]"

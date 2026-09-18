@@ -9,7 +9,7 @@ Requires PyMuPDF. field_validation.py itself stays stdlib-only.
 """
 
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 _BFCHAR = re.compile(r"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>")
 _BFRANGE = re.compile(r"<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>")
@@ -111,9 +111,80 @@ def build_meta(page: Any, doc: Any) -> Tuple[List[Dict[str, Any]], Dict[Any, Dic
     return spans, fonts, words
 
 
+def find_columns(words: List[Dict[str, Any]], page_width: float, page_height: float,
+                 min_gutter_pt: float = 18.0) -> List[Tuple[float, float]]:
+    """Vertical column gutters from word-rect topology (layout-bounded probing).
+
+    A gutter is an x-interval >= min_gutter_pt wide that stays empty across
+    >=85% of sampled content-height rows. Returns sorted (x0, x1) column
+    bands; single column when no gutter qualifies. Pure geometry, no text.
+    """
+    if not words or page_width <= 0:
+        return [(0.0, float(page_width or 0))]
+    edges = {0.0, float(page_width)}
+    for w in words:
+        edges.add(w["x0"])
+        edges.add(w["x1"])
+    xs = sorted(edges)
+    y0 = min(w["y0"] for w in words)
+    y1 = max(w["y1"] for w in words)
+    rows = max(1, int((y1 - y0) // 4))
+    gutters: List[Tuple[float, float]] = []
+    for a, b in zip(xs, xs[1:]):
+        if b - a < min_gutter_pt:
+            continue
+        mid = (a + b) / 2
+        hits = sum(1 for r in range(rows + 1)
+                   if any(w["x0"] <= mid <= w["x1"] and w["y0"] <= (y0 + r * 4) <= w["y1"]
+                          for w in words))
+        if hits / (rows + 1) < 0.15:
+            gutters.append((a, b))
+    cols: List[Tuple[float, float]] = []
+    cur = 0.0
+    for a, b in sorted(gutters):
+        if a > cur:
+            cols.append((cur, a))
+        cur = max(cur, b)
+    if cur < page_width:
+        cols.append((cur, float(page_width)))
+    return cols or [(0.0, float(page_width))]
+
+
+def column_limit(columns: List[Tuple[float, float]],
+                 run_bbox: Tuple[float, float, float, float]) -> Optional[float]:
+    """Right edge of the run's column (by bbox center), or None if outside."""
+    cx = (run_bbox[0] + run_bbox[2]) / 2
+    for a, b in columns:
+        if a <= cx <= b:
+            return b
+    return None
+
+
+def probe_end(words: List[Dict[str, Any]], columns: List[Tuple[float, float]],
+              run_bbox: Tuple[float, float, float, float], reach_pt: float) -> float:
+    """Right edge of the claimed-empty gap: min(run + reach, next listed word
+    start, column edge). Known content bounds the probe — only pixels the
+    layer claims are empty get inspected, so dense neighbors never DoS."""
+    x0, y0, x1, y1 = run_bbox
+    lh = max(1.0, y1 - y0)
+    end = x1 + reach_pt
+    for w in words:
+        if w["x0"] > x1 + 0.5 and abs((w["y1"] + w["y0"]) / 2 - (y1 + y0) / 2) < 3 * lh:
+            end = min(end, w["x0"])
+    lim = column_limit(columns, run_bbox)
+    # Gutter clamp needs a REAL gutter: if the column edge sits on the run's
+    # own edge (<1pt), the "gutter" is mere absence of listed words — exactly
+    # what is suspect in poison cases — so the bound is ignored and the full
+    # reach is probed. A genuine inter-column gutter stays clamped.
+    if lim is not None and lim - x1 >= 1.0:
+        end = min(end, lim)
+    return max(x1, end)
+
+
 def continuation_ink(page: Any, run_bbox: Tuple[float, float, float, float],
                      reach_pt: float, ink_ratio_floor: float = 0.02,
-                     dpi: int = 150) -> bool:
+                     dpi: int = 150, x_limit: Optional[float] = None,
+                     x_end: Optional[float] = None) -> bool:
     """Pixel continuation probe: is there ink immediately right of the run?
 
     Breaks the clip tautology (clip derived from untrusted run bbox) by
@@ -125,7 +196,17 @@ def continuation_ink(page: Any, run_bbox: Tuple[float, float, float, float],
     from PIL import Image
     import io
     x0, y0, x1, y1 = run_bbox
-    clip = (x1, y0, x1 + reach_pt, y1)
+    if x_end is not None:
+        x1 = min(x1 + reach_pt, x_end)
+        clip = (run_bbox[2], y0, x1, y1)
+    else:
+        if x_limit is not None:
+            # Gutter bound: ink in a structurally separate column is a neighbor
+            # field, not a continuation — the probe stops at the column edge.
+            x1 = min(x1, x_limit)
+        clip = (x1, y0, x1 + reach_pt, y1)
+        if x_limit is not None:
+            clip = (clip[0], clip[1], min(clip[2], x_limit), clip[3])
     if clip[2] <= clip[0] or clip[3] <= clip[1]:
         return False
     pix = page.get_pixmap(clip=clip, dpi=dpi, colorspace="GRAY")
