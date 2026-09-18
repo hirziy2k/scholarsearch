@@ -146,7 +146,7 @@ def _grime(page: Any, dpi: int = 50) -> float:
 def classify(pdf: Path) -> Dict[str, Any]:
     """First-page v0 heuristics. Order matters: localized/mobile override."""
     import fitz
-    doc = fitz.open(str(pdf))
+    doc = fitz.open(_longpath(pdf))
     page = doc[0]
     words = page.get_text("words")
     text = page.get_text()
@@ -178,9 +178,17 @@ def classify(pdf: Path) -> Dict[str, Any]:
     return {"path": str(pdf), "stratum": stratum, "signals": signals}
 
 
+def _longpath(p: Any) -> str:
+    """Windows MAX_PATH bypass: extended-length prefix for deep nests."""
+    s = str(p)
+    if sys.platform == "win32" and len(s) > 240 and not s.startswith("\\\\?\\"):
+        return "\\\\?\\" + str(Path(s).absolute())
+    return s
+
+
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
-    with open(path, "rb") as fh:
+    with open(_longpath(path), "rb") as fh:
         for chunk in iter(lambda: fh.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
@@ -257,7 +265,7 @@ def mutate_manifest(manifest_path: str, out_dir: str, rate: float = 0.10,
     mutants = []
     for i, rec in enumerate(picks):
         method = methods[i % len(methods)]
-        doc = fitz.open(rec["path"])
+        doc = fitz.open(_longpath(rec["path"]))
         try:
             detail = MUTATORS[method](doc, seed=seed + i)
         except ValueError as e:
@@ -322,6 +330,10 @@ def verify_manifest(manifest_path: str) -> int:
 
 
 def main(argv: List[str]) -> int:
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     if len(argv) >= 2 and argv[1] == "--verify":
         if len(argv) < 3:
             print("usage: build_shadow_corpus.py --verify <manifest.json>")
@@ -344,7 +356,7 @@ def main(argv: List[str]) -> int:
     need = 1000
     if "--need" in argv:
         need = int(argv[argv.index("--need") + 1])
-    pdfs = sorted(Path(argv[1]).glob("*.pdf"))
+    pdfs = sorted(Path(argv[1]).rglob("*.pdf"))
     buckets: Dict[str, List[Dict[str, Any]]] = {s: [] for s in STRATA}
     for pdf in pdfs:
         try:
