@@ -24,9 +24,10 @@ PARAM_SNAPSHOT = {
 }
 
 # Adversarial cost model: a false accept (poisoned doc passes) is a legal /
-# financial breach; a false reject is an availability dip the sender retries.
-# COST_FALSE_ACCEPT = 50x COST_FALSE_REJECT (directive floor: 10x-100x).
-COST_FALSE_ACCEPT = 50.0
+# financial hemorrhage; a false reject is an availability dip the sender
+# retries by submitting cleaner PDFs. COST_FALSE_ACCEPT = 100x (maximum
+# lethality to fraud — availability never outbids a breach).
+COST_FALSE_ACCEPT = 100.0
 COST_FALSE_REJECT = 1.0
 
 
@@ -115,11 +116,12 @@ def optimize(records: List[Dict[str, Any]],
              cost_fr: float = COST_FALSE_REJECT) -> Dict[str, Any]:
     """Parameter sweep over labeled records under an ASYMMETRIC cost model.
 
-    cost = cost_fa * FP + cost_fr * FN with cost_fa=50 (false accept = breach,
-    false reject = retryable dip). Youden's J is reported for reference only —
+    cost = cost_fa * FN + cost_fr * FP with cost_fa=100: FN counts anomalies
+    PASSED (false accepts = breaches), FP counts legits BLOCKED (false
+    rejects = retryable dips). Youden's J is reported for reference only —
     peacetime equal-weighting must never select production floors. Ties break
     toward STRICTER floors (default-deny): equal cost + equal delta selects
-    the smallest thresholds. Unlabeled records are excluded.
+    smaller ink floors AND larger SSIM floors. Unlabeled records are excluded.
 
     Raises ValueError on zero usable labels — an optimizer with no ground
     truth must not emit numbers.
@@ -143,7 +145,7 @@ def optimize(records: List[Dict[str, Any]],
             delta = sum(1 for r in lab
                         if r.get("permissive_ok") and not _recompute(r["probes"], f, s)) / len(lab)
             # fn = anomaly PASSED (false accept = breach); fp = legit BLOCKED
-            # (false reject = retryable dip). Cost weights the breach 50x.
+            # (false reject = retryable dip). Cost weights the breach 100x.
             cost = cost_fa * fn + cost_fr * fp
             j = tpr - fpr
             curve.append({"ink_floor": f, "ssim_floor": s, "tpr": round(tpr, 4),

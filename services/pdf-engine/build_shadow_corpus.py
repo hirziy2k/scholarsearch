@@ -29,7 +29,7 @@ import json
 import sys
 import unicodedata
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 STRATA = ["native", "clean_scan", "decay", "localized", "mobile"]
 QUOTA = {"native": 0.2, "clean_scan": 0.2, "decay": 0.2, "localized": 0.2, "mobile": 0.2}
@@ -186,11 +186,121 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def verify_manifest(manifest_path: str) -> int:
-    """Rehash every pinned doc. Any drift/missing/substitution -> halt 1."""
+HOMOGLYPH_MAP = str.maketrans({"a": "а", "e": "е", "o": "о", "c": "с", "A": "А",
+                                "E": "Е", "O": "О", "C": "С", "p": "р", "x": "х"})
+
+
+def mutate_whiteout(doc: Any, seed: int = 0) -> Dict[str, Any]:
+    """Cover a deterministic text word with an opaque white rect (Tipp-Ex)."""
+    import random
+    rng = random.Random(seed)
+    words = [w for w in doc[0].get_text("words") if len((w[4] or "").strip()) >= 3]
+    if not words:
+        raise ValueError("mutate_whiteout: no words")
+    w = rng.choice(words)
+    rect = [round(v, 1) for v in (w[0] - 1, w[1] - 1, w[2] + 1, w[3] + 1)]
+    doc[0].draw_rect(rect, color=(1, 1, 1), fill=(1, 1, 1))
+    return {"method": "whiteout", "page": 0, "bbox": rect, "covered": w[4]}
+
+
+def mutate_drift(doc: Any, seed: int = 0) -> Dict[str, Any]:
+    """Ghost-duplicate a word invisibly offset ~1px (cheap-scanner layer slip:
+    1px at 150dpi ≈ 0.48pt). Extraction sees doubled tokens."""
+    import random
+    rng = random.Random(seed)
+    words = [w for w in doc[0].get_text("words") if len((w[4] or "").strip()) >= 4]
+    if not words:
+        raise ValueError("mutate_drift: no words")
+    w = rng.choice(words)
+    doc[0].insert_text((w[0] + 0.48, w[3]), w[4], fontsize=10, color=(1, 1, 1))
+    return {"method": "drift1px", "page": 0, "bbox": [round(v, 1) for v in w[:4]],
+            "text": w[4]}
+
+
+def mutate_homoglyph(doc: Any, seed: int = 0) -> Dict[str, Any]:
+    """Append an invisible Cyrillic-swapped entity line (CMap/homoglyph vector:
+    renders blank, extracts hostile)."""
+    import random
+    rng = random.Random(seed)
+    cands = [w[4] for w in doc[0].get_text("words")
+             if (w[4] or "").isascii() and (w[4] or "").isalpha() and len(w[4]) >= 4]
+    base = rng.choice(cands) if cands else "Acme"
+    hostile = base.translate(HOMOGLYPH_MAP)
+    if hostile == base:
+        hostile = "Аcme"
+    doc[0].insert_text((72, 40), hostile, fontsize=10, color=(1, 1, 1))
+    return {"method": "homoglyph", "page": 0, "text": hostile, "base": base}
+
+
+MUTATORS = {"whiteout": mutate_whiteout, "drift1px": mutate_drift, "homoglyph": mutate_homoglyph}
+
+
+def mutate_manifest(manifest_path: str, out_dir: str, rate: float = 0.10,
+                    seed: int = 7) -> int:
+    """Poison our own well: mutate `rate` of pristine docs (round-robin across
+    the three methods, seeded positions), hash the mutants, and reseal the
+    manifest. Mutants are appended as first-class docs (mutated:true) with
+    ground-truth zones for zero-human auto-labeling. Quota counts stay pure.
+    """
+    import fitz
     man = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    docs = man.get("docs", [])
+    if man.get("mutated"):
+        print("REFUSE: manifest already mutated (re-mutating compounds ground truth)")
+        return 1
+    n = max(1, int(len(docs) * rate))
+    step = max(1, len(docs) // n)
+    picks = docs[::step][:n]
+    methods = list(MUTATORS)
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    mutants = []
+    for i, rec in enumerate(picks):
+        method = methods[i % len(methods)]
+        doc = fitz.open(rec["path"])
+        try:
+            detail = MUTATORS[method](doc, seed=seed + i)
+        except ValueError as e:
+            print(f"skip {rec['path']}: {e}")
+            continue
+        mp = out / (Path(rec["path"]).stem + f".mutated-{method}.pdf")
+        doc.save(str(mp))
+        doc.close()
+        mutants.append({"path": str(mp), "stratum": rec["stratum"], "mutated": True,
+                        "sha256": sha256_file(mp), "mutation": detail,
+                        "source": rec["path"]})
+    man["mutated"] = mutants
+    man["mutation_rate"] = rate
+    all_hashes = sorted([r["sha256"] for r in docs] + [m["sha256"] for m in mutants])
+    man["corpus_sha256"] = hashlib.sha256("".join(all_hashes).encode()).hexdigest()
+    Path(manifest_path).write_text(json.dumps(man, indent=1), encoding="utf-8")
+    print(f"MUTATED: {len(mutants)} ({', '.join(methods)}) | corpus {man['corpus_sha256'][:16]}…")
+    return 0
+
+
+def label_from_mutations(field_bbox: Optional[tuple],
+                         mutations: List[Dict[str, Any]]) -> Optional[bool]:
+    """Zero-human ground truth: a field intersecting a mutation zone is a
+    known anomaly (expected strict_ok=False); anything else is unlabeled
+    (None) — never auto-legit. Harness-side label assist for shadow runs."""
+    if not field_bbox or not mutations:
+        return None
+    for m in mutations:
+        zone = (m.get("mutation") or {}).get("bbox")
+        if zone and not (field_bbox[2] <= zone[0] or zone[2] <= field_bbox[0]
+                         or field_bbox[3] <= zone[1] or zone[3] <= field_bbox[1]):
+            return False
+        if (m.get("mutation") or {}).get("method") in ("homoglyph", "drift1px"):
+            return False  # page-level contamination: no field on it is clean
+    return None
+
+
+def verify_manifest(manifest_path: str) -> int:
+    """Rehash every pinned doc AND mutant. Any drift/missing/substitution -> halt 1."""
+    man = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    items = list(man.get("docs", [])) + list(man.get("mutated", []))
     bad = []
-    for rec in man.get("docs", []):
+    for rec in items:
         p = Path(rec["path"])
         if not p.exists():
             bad.append(f"{rec['path']}: MISSING")
@@ -202,11 +312,12 @@ def verify_manifest(manifest_path: str) -> int:
         for b in bad[:20]:
             print(f"  {b}")
         return 1
-    combo = hashlib.sha256("".join(sorted(r.get("sha256", "") for r in man.get("docs", []))).encode()).hexdigest()
+    combo = hashlib.sha256("".join(sorted(r.get("sha256", "") for r in items)).encode()).hexdigest()
     if combo != man.get("corpus_sha256", ""):
         print("DRIFT-HALT: corpus digest mismatch (membership changed)")
         return 1
-    print(f"VERIFIED: {len(man.get('docs', []))} docs, corpus {man.get('corpus_sha256', '')[:16]}…")
+    print(f"VERIFIED: {len(items)} docs ({len(man.get('mutated', []))} mutated), "
+          f"corpus {man.get('corpus_sha256', '')[:16]}…")
     return 0
 
 
@@ -216,6 +327,16 @@ def main(argv: List[str]) -> int:
             print("usage: build_shadow_corpus.py --verify <manifest.json>")
             return 2
         return verify_manifest(argv[2])
+    if len(argv) >= 2 and argv[1] == "--mutate":
+        if len(argv) < 4:
+            print("usage: build_shadow_corpus.py --mutate <manifest.json> <out_dir> [--rate R] [--seed S]")
+            return 2
+        rate, seed = 0.10, 7
+        if "--rate" in argv:
+            rate = float(argv[argv.index("--rate") + 1])
+        if "--seed" in argv:
+            seed = int(argv[argv.index("--seed") + 1])
+        return mutate_manifest(argv[2], argv[3], rate=rate, seed=seed)
     if len(argv) < 3:
         print("usage: build_shadow_corpus.py <pdf_dir> <out_manifest.json> [--need N]")
         print("   or: build_shadow_corpus.py --verify <manifest.json>")
