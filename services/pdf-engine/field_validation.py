@@ -63,6 +63,7 @@ REJECT_FONT_ENCODING = "REJECT:SUSPECT_FONT_ENCODING"
 REJECT_TRUNCATION = "REJECT:TRUNCATION_BOUNDARY"
 REJECT_HOSTILE_UNICODE = "REJECT:HOSTILE_UNICODE"
 REJECT_OCR_UNAVAILABLE = "REJECT:OCR_UNAVAILABLE"
+REJECT_DOCUMENT_TAMPERING = "REJECT:SUSPECT_DOCUMENT_TAMPERING"
 
 MIN_FONT_PT = 6.0
 STANDARD_ENCODINGS = {"WinAnsiEncoding", "MacRomanEncoding", "StandardEncoding"}
@@ -344,7 +345,9 @@ def validate_field(field: Dict[str, Any], value: Any, source_text: str = "",
                  strict_meta: bool = False,
                  ocr_fn: Optional[Callable[[Tuple[float, float, float, float]],
                                            Tuple[str, List[Dict[str, Any]]]]] = None,
-                 ink_fn: Optional[Callable[[Tuple[float, float, float, float], float], bool]] = None
+                 ink_fn: Optional[Callable[[Tuple[float, float, float, float], float], bool]] = None,
+                 void_fn: Optional[Callable[[Tuple[float, float, float, float]],
+                                            Tuple[bool, Dict[str, Any]]]] = None
                  ) -> Tuple[bool, str]:
     """Dispatch by registry. Class B order: quarantine -> match -> localize ->
     field tripwire -> (clean: boundary | tainted: ink-probe + OCR re-verdict).
@@ -372,6 +375,17 @@ def validate_field(field: Dict[str, Any], value: Any, source_text: str = "",
             # no metadata: string match only, no pixel or boundary verdicts
             return validate_class_b(field, value, source_text)
         bbox = _locate_run(value, words) or _locate_best_window(value, words)
+        if void_fn is not None and bbox is not None:
+            # Whiteout inversion runs before every other pixel verdict: a
+            # synthetic void makes OCR and ink ratios meaningless. Probe
+            # errors are no-evidence (other gates still apply), a positive is
+            # fail-closed — absence of noise is the signal.
+            try:
+                is_void, det = void_fn(bbox)
+                if is_void:
+                    return False, f"{REJECT_DOCUMENT_TAMPERING}: {det}"
+            except Exception:
+                pass
         verdict, _why = field_span_verdict(bbox, spans, fonts)
         if verdict == "fallback":
             return _ocr_path(field, value, words, bbox, ocr_fn, ink_fn)
