@@ -12,12 +12,19 @@ processed:
   mobile      20%  lighting warp / geometric skew proxies
 
 Usage: python build_shadow_corpus.py <pdf_dir> <out_manifest.json> [--need N]
+       python build_shadow_corpus.py --verify <manifest.json>
 Exit 0 + manifest only when every quota is met; otherwise exit 1 listing the
 shortfall (no partial runs — a short stratum silently biases every threshold).
+
+Immutability: the manifest pins SHA-256 per document plus a corpus digest
+(sorted per-doc hashes, hashed again). --verify rehashes and halts nonzero on
+any drift, deletion, or substitution — tuning against a shifting foundation
+is mathematical fiction, so a drifted corpus refuses to run.
 
 Heuristics are v0, deterministic, and documented below. Requires PyMuPDF.
 """
 
+import hashlib
 import json
 import sys
 import unicodedata
@@ -171,9 +178,47 @@ def classify(pdf: Path) -> Dict[str, Any]:
     return {"path": str(pdf), "stratum": stratum, "signals": signals}
 
 
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def verify_manifest(manifest_path: str) -> int:
+    """Rehash every pinned doc. Any drift/missing/substitution -> halt 1."""
+    man = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    bad = []
+    for rec in man.get("docs", []):
+        p = Path(rec["path"])
+        if not p.exists():
+            bad.append(f"{rec['path']}: MISSING")
+            continue
+        if sha256_file(p) != rec.get("sha256", ""):
+            bad.append(f"{rec['path']}: DRIFT")
+    if bad:
+        print(f"DRIFT-HALT ({len(bad)}):")
+        for b in bad[:20]:
+            print(f"  {b}")
+        return 1
+    combo = hashlib.sha256("".join(sorted(r.get("sha256", "") for r in man.get("docs", []))).encode()).hexdigest()
+    if combo != man.get("corpus_sha256", ""):
+        print("DRIFT-HALT: corpus digest mismatch (membership changed)")
+        return 1
+    print(f"VERIFIED: {len(man.get('docs', []))} docs, corpus {man.get('corpus_sha256', '')[:16]}…")
+    return 0
+
+
 def main(argv: List[str]) -> int:
+    if len(argv) >= 2 and argv[1] == "--verify":
+        if len(argv) < 3:
+            print("usage: build_shadow_corpus.py --verify <manifest.json>")
+            return 2
+        return verify_manifest(argv[2])
     if len(argv) < 3:
         print("usage: build_shadow_corpus.py <pdf_dir> <out_manifest.json> [--need N]")
+        print("   or: build_shadow_corpus.py --verify <manifest.json>")
         return 2
     need = 1000
     if "--need" in argv:
@@ -193,10 +238,16 @@ def main(argv: List[str]) -> int:
         print(f"INVALID corpus: shortfall {short} (have "
               + ", ".join(f"{s}={len(buckets[s])}" for s in STRATA) + ")")
         return 1
-    manifest = {"need": need, "quota": quota_n,
-                "docs": [r for s in STRATA for r in buckets[s][:quota_n[s]]]}
+    docs = []
+    for s in STRATA:
+        for r in buckets[s][:quota_n[s]]:
+            r["sha256"] = sha256_file(Path(r["path"]))
+            docs.append(r)
+    corpus_sha = hashlib.sha256("".join(sorted(r["sha256"] for r in docs)).encode()).hexdigest()
+    manifest = {"need": need, "quota": quota_n, "corpus_sha256": corpus_sha, "docs": docs}
     Path(argv[2]).write_text(json.dumps(manifest, indent=1), encoding="utf-8")
-    print(f"VALID corpus: {need} docs @ " + ", ".join(f"{s}={quota_n[s]}" for s in STRATA))
+    print(f"VALID corpus: {need} docs @ " + ", ".join(f"{s}={quota_n[s]}" for s in STRATA)
+          + f" | corpus {corpus_sha[:16]}…")
     return 0
 
 

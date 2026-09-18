@@ -23,6 +23,12 @@ PARAM_SNAPSHOT = {
     "min_font_pt": 6.0,
 }
 
+# Adversarial cost model: a false accept (poisoned doc passes) is a legal /
+# financial breach; a false reject is an availability dip the sender retries.
+# COST_FALSE_ACCEPT = 50x COST_FALSE_REJECT (directive floor: 10x-100x).
+COST_FALSE_ACCEPT = 50.0
+COST_FALSE_REJECT = 1.0
+
 
 def run_shadow(doc_id: str, page_num: int, field: Dict[str, Any], value: Any,
                source_text: str,
@@ -104,11 +110,16 @@ def _recompute(probes: Dict[str, Any], ink_floor: float, ssim_floor: float,
 
 def optimize(records: List[Dict[str, Any]],
              ink_grid: Optional[List[float]] = None,
-             ssim_grid: Optional[List[float]] = None) -> Dict[str, Any]:
-    """Parameter sweep over labeled records. Objective: Youden's J
-    (TPR_anomaly − FPR_legit); ties broken by smallest shadow delta vs the
-    permissive baseline. Unlabeled records are excluded. Returns the winning
-    candidate + full curve (written to candidate_config.json by the caller).
+             ssim_grid: Optional[List[float]] = None,
+             cost_fa: float = COST_FALSE_ACCEPT,
+             cost_fr: float = COST_FALSE_REJECT) -> Dict[str, Any]:
+    """Parameter sweep over labeled records under an ASYMMETRIC cost model.
+
+    cost = cost_fa * FP + cost_fr * FN with cost_fa=50 (false accept = breach,
+    false reject = retryable dip). Youden's J is reported for reference only —
+    peacetime equal-weighting must never select production floors. Ties break
+    toward STRICTER floors (default-deny): equal cost + equal delta selects
+    the smallest thresholds. Unlabeled records are excluded.
 
     Raises ValueError on zero usable labels — an optimizer with no ground
     truth must not emit numbers.
@@ -124,22 +135,29 @@ def optimize(records: List[Dict[str, Any]],
     curve = []
     for f in ink_grid:
         for s in ssim_grid:
-            tp = sum(1 for r in anomalies if not _recompute(r["probes"], f, s))
+            fn = sum(1 for r in anomalies if _recompute(r["probes"], f, s))
             fp = sum(1 for r in legits if not _recompute(r["probes"], f, s))
+            tp = len(anomalies) - fn
             tpr = tp / len(anomalies) if anomalies else 0.0
             fpr = fp / len(legits) if legits else 0.0
             delta = sum(1 for r in lab
                         if r.get("permissive_ok") and not _recompute(r["probes"], f, s)) / len(lab)
+            # fn = anomaly PASSED (false accept = breach); fp = legit BLOCKED
+            # (false reject = retryable dip). Cost weights the breach 50x.
+            cost = cost_fa * fn + cost_fr * fp
             j = tpr - fpr
             curve.append({"ink_floor": f, "ssim_floor": s, "tpr": round(tpr, 4),
-                          "fpr": round(fpr, 4), "delta": round(delta, 4), "j": round(j, 4)})
-            # Ties break toward LARGER floors (fewer future false alarms):
-            # equal J on labeled data means identical evidence, so availability wins.
-            key = (j, -delta, (f + s))
-            if best is None or key > best["_key"]:
+                          "fpr": round(fpr, 4), "delta": round(delta, 4),
+                          "cost": round(cost, 2), "j": round(j, 4)})
+            # Default-deny ties: smaller ink floor rejects more; LARGER ssim
+            # floor rejects more (direction-aware — a raw sum would conflate
+            # them). Equal cost+delta selects min ink AND max ssim.
+            key = (cost, delta, (f - s))
+            if best is None or key < best["_key"]:
                 best = {"ink_ratio_floor": f, "ssim_floor": s, "tpr": round(tpr, 4),
-                        "fpr": round(fpr, 4), "delta": round(delta, 4), "j": round(j, 4),
-                        "_key": key}
+                        "fpr": round(fpr, 4), "delta": round(delta, 4),
+                        "cost": round(cost, 2), "j": round(j, 4),
+                        "cost_fa": cost_fa, "cost_fr": cost_fr, "_key": key}
     assert best is not None
     best = {k: v for k, v in best.items() if not k.startswith("_")}
     return {"n_labeled": len(lab), "n_anomaly": len(anomalies), "n_legit": len(legits),
