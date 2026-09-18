@@ -181,17 +181,122 @@ def probe_end(words: List[Dict[str, Any]], columns: List[Tuple[float, float]],
     return max(x1, end)
 
 
+def ink_mask(img, sat_thresh: int = 40, lum_thresh: int = 150) -> Any:
+    """Artifact & chromatic filter -> binary ink mask (Pillow '1' image).
+
+    Keeps achromatic dark pixels (black/dark-gray body text); drops chromatic
+    ink (blue/red company chops, stamps) by saturation and salt-and-pepper
+    scanner noise by 3x3 morphological opening (erosion then dilation), which
+    erases isolated specks while preserving glyph strokes. Forbidden to probe
+    raw pixels on scanned stock — all ink ratios derive from this mask.
+    """
+    from PIL import Image, ImageFilter
+    rgb = img.convert("RGB")
+    px = list(rgb.getdata())
+    m = Image.new("1", rgb.size)
+    md = m.load()
+    W, H = rgb.size
+    for i, (r, g, b) in enumerate(px):
+        sat = max(r, g, b) - min(r, g, b)
+        lum = (r + g + b) // 3
+        md[i % W, i // W] = 255 if (sat < sat_thresh and lum < lum_thresh) else 0
+    return m.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.MaxFilter(3))
+
+
+def mask_ratio(mask: Any) -> float:
+    dd = list(mask.getdata())
+    return (sum(1 for v in dd if v) / len(dd)) if dd else 0.0
+
+
+def background_stats(img: Any) -> Dict[str, float]:
+    """Page background luminance mean/variance over non-ink, achromatic pixels.
+
+    Establishes the paper noise floor (grain, shadow, JPEG artifacts) that a
+    synthetic void will violate by its perfection.
+    """
+    rgb = img.convert("RGB")
+    vals = []
+    for r, g, b in rgb.getdata():
+        if max(r, g, b) - min(r, g, b) < 40 and (r + g + b) // 3 > 150:
+            vals.append((r + g + b) // 3)
+    if not vals:
+        return {"mean": 255.0, "var": 0.0, "n": 0}
+    mean = sum(vals) / len(vals)
+    var = sum((v - mean) ** 2 for v in vals) / len(vals)
+    return {"mean": mean, "var": var, "n": len(vals)}
+
+
+def void_check(page: Any, bbox: Tuple[float, float, float, float],
+               page_bg: Optional[Dict[str, float]] = None, dpi: int = 150,
+               var_floor: float = 0.5, white_floor: float = 250.0,
+               void_fraction: float = 0.20,
+               words: Optional[List[Dict[str, Any]]] = None) -> Tuple[bool, Dict[str, float]]:
+    """Zero-variance anomaly: whiteout looks like paper but has no noise.
+
+    Two triggers, either fail-closed:
+    (a) void ∩ claimed ink — any void cell intersecting a listed word rect
+        means the layer claims glyphs where pixels show synthetic perfection
+        (partial erasures: 1 cell suffices, no fraction needed);
+    (b) void fraction >= 20% — fully erased fields with no surviving rects.
+    Inter-word gaps never intersect word rects and sit ~10%, so clean copy
+    stays silent. Callers probe only bboxes where the layer claims content.
+    """
+    from PIL import Image
+    import io
+    pix = page.get_pixmap(clip=bbox, dpi=dpi)
+    img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("L")
+    W, H = img.size
+    if W == 0 or H == 0:
+        return False, {"void_frac": 0.0, "cells": 0}
+    vals = list(img.getdata())
+    side = max(8, H // 2)
+    nx = max(1, W // side)
+    zoom = dpi / 72.0
+    bx0, by0 = bbox[0], bbox[1]
+    void_cells = 0
+    hit_claim = False
+    total = 0
+    for cx in range(nx):
+        for cy in range(2):
+            x0, y0 = cx * side, cy * (H // 2)
+            cell = [vals[(y0 + dy) * W + (x0 + dx)]
+                    for dy in range(min(H // 2, H - y0))
+                    for dx in range(min(side, W - x0))]
+            if not cell:
+                continue
+            total += 1
+            mean = sum(cell) / len(cell)
+            var = sum((v - mean) ** 2 for v in cell) / len(cell)
+            if var < var_floor and mean >= white_floor:
+                void_cells += 1
+                if words:
+                    # cell rect back in PDF pts; 1pt tolerance
+                    c = (bx0 + x0 / zoom - 1, by0 + y0 / zoom - 1,
+                         bx0 + (x0 + side) / zoom + 1, by0 + (y0 + H // 2) / zoom + 1)
+                    for w in words:
+                        if not (c[2] <= w["x0"] or w["x1"] <= c[0]
+                                or c[3] <= w["y0"] or w["y1"] <= c[1]):
+                            hit_claim = True
+                            break
+    frac = (void_cells / total) if total else 0.0
+    detail = {"void_frac": round(frac, 3), "cells": total,
+              "void_on_claim": hit_claim}
+    return (hit_claim or frac >= void_fraction), detail
+
+
 def continuation_ink(page: Any, run_bbox: Tuple[float, float, float, float],
                      reach_pt: float, ink_ratio_floor: float = 0.02,
-                     dpi: int = 150, x_limit: Optional[float] = None,
+                     dpi: int = 300, x_limit: Optional[float] = None,
                      x_end: Optional[float] = None) -> bool:
-    """Pixel continuation probe: is there ink immediately right of the run?
+    """Probe at 300dpi: glyph strokes (~7px) survive the 3x3 opening while
+    single-pixel dust dies — at 150dpi thin strokes erode away entirely,
+    blinding the probe (measured regression). Strips are tiny; cost is trivial."""
+    """Pixel continuation probe: is there BODY-TEXT ink right of the run?
 
-    Breaks the clip tautology (clip derived from untrusted run bbox) by
-    inspecting the strip the model claims is empty. reach_pt comes from the
-    native line's median word gap (bounded); ink above floor => the pixels
-    contain more than the extraction -> truncated. Background-white assumed
-    (bg-colored ink is rejected upstream). Stdlib + PyMuPDF + Pillow.
+    The strip passes through ink_mask() first — chromatic chop/stamp ink and
+    salt-and-pepper scanner noise never reach the ratio. reach_pt comes from
+    the native line's median word gap (bounded); filtered ink above floor =>
+    the pixels contain more than the extraction -> truncated.
     """
     from PIL import Image
     import io
@@ -209,13 +314,9 @@ def continuation_ink(page: Any, run_bbox: Tuple[float, float, float, float],
             clip = (clip[0], clip[1], min(clip[2], x_limit), clip[3])
     if clip[2] <= clip[0] or clip[3] <= clip[1]:
         return False
-    pix = page.get_pixmap(clip=clip, dpi=dpi, colorspace="GRAY")
-    img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("L")
-    px = list(img.getdata())
-    if not px:
-        return False
-    ink = sum(1 for v in px if v < 128)
-    return (ink / len(px)) > ink_ratio_floor
+    pix = page.get_pixmap(clip=clip, dpi=dpi)
+    img = Image.open(io.BytesIO(pix.tobytes("png")))
+    return mask_ratio(ink_mask(img)) > ink_ratio_floor
 
 
 def ocr_field(page: Any, bbox: Tuple[float, float, float, float],
@@ -253,3 +354,92 @@ def ocr_field(page: Any, bbox: Tuple[float, float, float, float],
     except Exception:
         pass
     return text.strip(), words
+
+
+def is_scanned(page: Any, words: List[Dict[str, Any]]) -> bool:
+    """Heuristic: image-backed page with (near-)no native text layer."""
+    try:
+        return len(words) < 5 and len(page.get_images()) > 0
+    except Exception:
+        return False
+
+
+def ssim_gray(a_vals: List[int], b_vals: List[int]) -> float:
+    """Whole-patch simplified SSIM over two equal-length gray sequences."""
+    n = len(a_vals)
+    if n == 0 or len(b_vals) != n:
+        return 0.0
+    ma = sum(a_vals) / n
+    mb = sum(b_vals) / n
+    va = sum((v - ma) ** 2 for v in a_vals) / n
+    vb = sum((v - mb) ** 2 for v in b_vals) / n
+    cov = sum((x - ma) * (y - mb) for x, y in zip(a_vals, b_vals)) / n
+    c1 = (0.01 * 255) ** 2
+    c2 = (0.03 * 255) ** 2
+    den = (ma * ma + mb * mb + c1) * (va + vb + c2)
+    if den == 0:
+        return 1.0 if va == 0 and vb == 0 else 0.0
+    return ((2 * ma * mb + c1) * (2 * cov + c2)) / den
+
+
+def check_alignment(page: Any, words: List[Dict[str, Any]], dpi: int = 150,
+                    drift_px: float = 5.0, ssim_floor: float = 0.75
+                    ) -> Tuple[bool, Dict[str, Any]]:
+    """Spatial Confidence Anchor: prove layer↔raster registration with two
+    independent engines before trusting any bbox on this page.
+
+    Native digital pages skip (fast path). Scanned pages: longest alphanumeric
+    word becomes the anchor; Tesseract re-discovers it on a full-page render;
+    verdict requires center drift <= 5px AND clip SSIM >= floor. Failure means
+    the coordinate map is unproven -> whole page degrades to focal-raster
+    fallback. Raises RuntimeError('OCR_UNAVAILABLE') without Tesseract.
+    """
+    if not is_scanned(page, words):
+        return True, {"mode": "native", "drift_px": 0.0, "ssim": 1.0}
+    try:
+        import pytesseract
+        from PIL import Image
+    except ImportError as e:
+        raise RuntimeError("OCR_UNAVAILABLE") from e
+    import io
+    cands = [w for w in words if re.fullmatch(r"[A-Za-z0-9]{4,}", w["text"] or "")]
+    anchor = max(cands, key=lambda w: len(w["text"])) if cands else None
+    if anchor is None:
+        return False, {"mode": "no-anchor", "drift_px": None, "ssim": 0.0}
+    zoom = dpi / 72.0
+    full = page.get_pixmap(dpi=dpi)
+    img = Image.open(io.BytesIO(full.tobytes("png")))
+    data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+    best, best_hit = None, -1
+    at = anchor["text"].lower()
+    for i, t in enumerate(data.get("text", [])):
+        t = (t or "").strip().lower()
+        if not t:
+            continue
+        hit = len(set(t) & set(at)) / max(len(set(t) | set(at)), 1)
+        if hit > best_hit:
+            best_hit, best = hit, i
+    if best is None or best_hit < 0.5:
+        return False, {"mode": "anchor-lost", "drift_px": None, "ssim": 0.0}
+    ox = (data["left"][best] + data["width"][best] / 2) / zoom
+    oy = (data["top"][best] + data["height"][best] / 2) / zoom
+    ax = (anchor["x0"] + anchor["x1"]) / 2
+    ay = (anchor["y0"] + anchor["y1"]) / 2
+    drift = (((ox - ax) * zoom) ** 2 + ((oy - ay) * zoom) ** 2) ** 0.5
+    clip = (anchor["x0"], anchor["y0"], anchor["x1"], anchor["y1"])
+    aimg = Image.open(io.BytesIO(
+        page.get_pixmap(clip=clip, dpi=dpi).tobytes("png"))).convert("L")
+    if mask_ratio(ink_mask(aimg)) < 0.005:
+        # Invisible OCR layer (white text on raster): SSIM is meaningless on
+        # blank pixels, so alignment rests on OCR token fidelity + drift.
+        aligned = best_hit >= 0.9 and drift <= drift_px
+        return aligned, {"mode": "invisible-layer", "anchor": anchor["text"],
+                         "drift_px": round(drift, 2), "ocr_hit": round(best_hit, 3)}
+    ox0, oy0 = data["left"][best] / zoom, data["top"][best] / zoom
+    oclip = (ox0, oy0, ox0 + data["width"][best] / zoom, oy0 + data["height"][best] / zoom)
+    oimg = Image.open(io.BytesIO(
+        page.get_pixmap(clip=oclip, dpi=dpi).tobytes("png"))).convert("L").resize(aimg.size)
+    s = ssim_gray(list(aimg.getdata()), list(oimg.getdata()))
+    detail = {"mode": "anchored", "anchor": anchor["text"],
+              "drift_px": round(drift, 2), "ssim": round(s, 3)}
+    return (drift <= drift_px and s >= ssim_floor), detail
