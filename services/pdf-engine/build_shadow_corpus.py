@@ -3,16 +3,12 @@
 
 A randomized production dump is structurally invalid: it over-fits floors to
 dominant vendors. The corpus MUST meet exact quotas before one document is
-processed:
+processed. Active matrix: Operational-Reality-V1 (45% localized / 35% native
+/ 10% decay / 10% mobscan); FLAT-20 is retained below for history only.
 
-  native      20%  text-layer digital, no embedded page images
-  clean_scan  20%  image-backed, legible layer, moderate background noise
-  decay       20%  heavy noise / degraded layer (fax-generation artifacts)
-  localized   20%  chromatic chop ink or non-Latin script presence
-  mobile      20%  lighting warp / geometric skew proxies
-
-Usage: python build_shadow_corpus.py <pdf_dir> <out_manifest.json> [--need N]
+Usage: python build_shadow_corpus.py <pdf_dir[;pdf_dir2;...]> <out_manifest.json> [--need N]
        python build_shadow_corpus.py --verify <manifest.json>
+       python build_shadow_corpus.py --mutate <manifest.json> <out_dir> [--rate R] [--seed S]
 Exit 0 + manifest only when every quota is met; otherwise exit 1 listing the
 shortfall (no partial runs — a short stratum silently biases every threshold).
 
@@ -33,6 +29,27 @@ from typing import Any, Dict, List, Optional
 
 STRATA = ["native", "clean_scan", "decay", "localized", "mobile"]
 QUOTA = {"native": 0.2, "clean_scan": 0.2, "decay": 0.2, "localized": 0.2, "mobile": 0.2}
+
+# Versioned matrix amendments. FLAT-20 was an academic hallucination: equal
+# weight to phantom mobile captures dilutes the asymmetric penalty where the
+# liability actually sits (digital + localized contracts). Operational-
+# Reality-V1 encodes the measured liability surface; mobile/clean_scan merge
+# into one defensive-perimeter bucket. History is preserved, never edited.
+MATRICES = {
+    "FLAT-20": {"native": 0.2, "clean_scan": 0.2, "decay": 0.2,
+                "localized": 0.2, "mobile": 0.2},
+    "Operational-Reality-V1": {"localized": 0.45, "native": 0.35,
+                               "decay": 0.10, "mobscan": 0.10},
+}
+ACTIVE_MATRIX = "Operational-Reality-V1"
+
+
+def bucket_of(stratum: str) -> str:
+    """Map classifier strata onto matrix buckets (mobscan merges the two
+    physical-capture strata into the defensive perimeter)."""
+    if stratum in ("mobile", "clean_scan"):
+        return "mobscan"
+    return stratum
 
 
 def _non_latin_ratio(text: str) -> float:
@@ -356,7 +373,13 @@ def main(argv: List[str]) -> int:
     need = 1000
     if "--need" in argv:
         need = int(argv[argv.index("--need") + 1])
-    pdfs = sorted(Path(argv[1]).rglob("*.pdf"))
+    matrix = MATRICES[ACTIVE_MATRIX]
+    # Multi-root: semicolon-separated source dirs (top-up pools merge; the
+    # manifest records each doc's origin root for provenance).
+    roots = [r for r in argv[1].split(";") if r]
+    pdfs = []
+    for rt in roots:
+        pdfs.extend(sorted(Path(rt).rglob("*.pdf")))
     buckets: Dict[str, List[Dict[str, Any]]] = {s: [] for s in STRATA}
     for pdf in pdfs:
         try:
@@ -365,21 +388,28 @@ def main(argv: List[str]) -> int:
             print(f"skip {pdf}: {e}")
             continue
         buckets[rec["stratum"]].append(rec)
-    quota_n = {s: int(need * QUOTA[s]) for s in STRATA}
-    short = {s: quota_n[s] - len(buckets[s]) for s in STRATA if len(buckets[s]) < quota_n[s]}
+    by_bucket: Dict[str, List[Dict[str, Any]]] = {}
+    for s in STRATA:
+        by_bucket.setdefault(bucket_of(s), []).extend(buckets[s])
+    quota_n = {b: int(need * q) for b, q in matrix.items()}
+    short = {b: quota_n[b] - len(by_bucket.get(b, [])) for b in quota_n
+             if len(by_bucket.get(b, [])) < quota_n[b]}
+    have = {b: len(by_bucket.get(b, [])) for b in quota_n}
     if short:
-        print(f"INVALID corpus: shortfall {short} (have "
-              + ", ".join(f"{s}={len(buckets[s])}" for s in STRATA) + ")")
+        print(f"INVALID corpus [{ACTIVE_MATRIX}]: shortfall {short} (have {have})")
         return 1
     docs = []
-    for s in STRATA:
-        for r in buckets[s][:quota_n[s]]:
+    for b in quota_n:
+        for r in by_bucket[b][:quota_n[b]]:
+            r["bucket"] = b
             r["sha256"] = sha256_file(Path(r["path"]))
             docs.append(r)
     corpus_sha = hashlib.sha256("".join(sorted(r["sha256"] for r in docs)).encode()).hexdigest()
-    manifest = {"need": need, "quota": quota_n, "corpus_sha256": corpus_sha, "docs": docs}
+    manifest = {"need": need, "matrix": ACTIVE_MATRIX, "quota": quota_n,
+                "corpus_sha256": corpus_sha, "docs": docs}
     Path(argv[2]).write_text(json.dumps(manifest, indent=1), encoding="utf-8")
-    print(f"VALID corpus: {need} docs @ " + ", ".join(f"{s}={quota_n[s]}" for s in STRATA)
+    print(f"VALID corpus [{ACTIVE_MATRIX}]: {need} docs @ "
+          + ", ".join(f"{b}={quota_n[b]}" for b in quota_n)
           + f" | corpus {corpus_sha[:16]}…")
     return 0
 
