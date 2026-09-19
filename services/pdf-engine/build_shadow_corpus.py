@@ -22,6 +22,7 @@ Heuristics are v0, deterministic, and documented below. Requires PyMuPDF.
 
 import hashlib
 import json
+import os
 import sys
 import unicodedata
 from pathlib import Path
@@ -44,12 +45,29 @@ MATRICES = {
 ACTIVE_MATRIX = "Operational-Reality-V1"
 
 
-def bucket_of(stratum: str) -> str:
-    """Map classifier strata onto matrix buckets (mobscan merges the two
-    physical-capture strata into the defensive perimeter)."""
-    if stratum in ("mobile", "clean_scan"):
-        return "mobscan"
-    return stratum
+def phenomena(sig: Dict[str, Any], n_img: int, n_words: int) -> List[str]:
+    """Independent phenomenon predicates (coverage sets, NOT a partition).
+
+    A scanned chop-bearing circular IS both scan-grain stock and localized
+    content — single-label assignment drained shared docs into whichever
+    bucket was checked first and starved the rest (measured: mobscan pool
+    collapsed to 5 while ~12% of the population exhibits capture phenomena).
+    Buckets overlap by design; the manifest records every membership and the
+    optimizer consumes per-field marginals, never bucket identity.
+    """
+    out = []
+    if sig.get("non_latin", 0) > 0.02 or sig.get("chroma", 0) > 0.0005:
+        out.append("localized")
+    if n_img == 0 and n_words >= 20:
+        out.append("native")
+    if (sig.get("grime", 0) >= 0.05 or sig.get("specks", 0) >= 0.01
+            or (n_img > 0 and n_words < 3)):
+        out.append("decay")
+    calm = (n_img > 0 and sig.get("grime", 9) < 0.05 and sig.get("specks", 9) < 0.01
+            and n_words >= 3 and sig.get("warp", 9) <= 0.06)
+    if sig.get("warp", 0) > 0.06 or calm:
+        out.append("mobscan")
+    return out
 
 
 def _non_latin_ratio(text: str) -> float:
@@ -179,17 +197,24 @@ def classify(pdf: Path) -> Dict[str, Any]:
         "warp": round(_warp(page), 4),
     }
     if n_img == 0 and len(words) >= 20:
+        # Digital ground truth first: pixel stats are pristine regardless of
+        # content markings.
         stratum = "native"
-    elif signals["non_latin"] > 0.02 or signals["chroma"] > 0.0005:
+    elif n_img == 0 and (signals["non_latin"] > 0.02 or signals["chroma"] > 0.0005):
+        # Digital admin with color graphics / non-Latin letterheads.
         stratum = "localized"
     elif signals["warp"] > 0.06:
-        # Mobile BEFORE decay: a warped+noisy doc reads as capture-first;
-        # residual misbucketing is quota impurity the shadow deltas expose.
+        # Capture-first: geometric warp is a property of the camera, not the
+        # content — any warped doc is physical-capture stock.
         stratum = "mobile"
     elif signals["grime"] > 0.02 or signals["specks"] > 0.005 or (n_img > 0 and len(words) < 3):
         stratum = "decay"
     elif n_img > 0:
+        # Image-backed and calm: the clean-scan perimeter (includes pristine
+        # digital-with-logo, statistically harmless here).
         stratum = "clean_scan"
+    elif signals["non_latin"] > 0.02 or signals["chroma"] > 0.0005:
+        stratum = "localized"
     else:
         stratum = "native"
     return {"path": str(pdf), "stratum": stratum, "signals": signals}
@@ -282,14 +307,31 @@ def mutate_manifest(manifest_path: str, out_dir: str, rate: float = 0.10,
     mutants = []
     for i, rec in enumerate(picks):
         method = methods[i % len(methods)]
-        doc = fitz.open(_longpath(rec["path"]))
+        try:
+            doc = fitz.open(_longpath(rec["path"]))
+        except Exception as e:
+            print(f"skip {rec['path']}: {e}")
+            continue
+        # Unique mutant filename: source-hash prefix disambiguates duplicate
+        # stems across folders (measured: 36 duplicate stems in VUC dump —
+        # stem-only names silently overwrote each other and forged DRIFT).
+        try:
+            srchash = sha256_file(Path(rec["path"]))[:8]
+        except Exception as e:
+            print(f"skip {rec['path']}: {e}")
+            continue
         try:
             detail = MUTATORS[method](doc, seed=seed + i)
         except ValueError as e:
             print(f"skip {rec['path']}: {e}")
             continue
-        mp = out / (Path(rec["path"]).stem + f".mutated-{method}.pdf")
-        doc.save(str(mp))
+        mp = out / (Path(rec["path"]).stem + f".{srchash}.mutated-{method}.pdf")
+        try:
+            doc.save(str(mp))
+        except Exception as e:
+            print(f"skip {rec['path']}: save failed: {e}")
+            doc.close()
+            continue
         doc.close()
         mutants.append({"path": str(mp), "stratum": rec["stratum"], "mutated": True,
                         "sha256": sha256_file(mp), "mutation": detail,
@@ -327,7 +369,8 @@ def verify_manifest(manifest_path: str) -> int:
     bad = []
     for rec in items:
         p = Path(rec["path"])
-        if not p.exists():
+        # exists() needs the same long-path bypass (returns False past 260 chars)
+        if not os.path.exists(_longpath(p)):
             bad.append(f"{rec['path']}: MISSING")
             continue
         if sha256_file(p) != rec.get("sha256", ""):
@@ -381,6 +424,7 @@ def main(argv: List[str]) -> int:
     for rt in roots:
         pdfs.extend(sorted(Path(rt).rglob("*.pdf")))
     buckets: Dict[str, List[Dict[str, Any]]] = {s: [] for s in STRATA}
+    pheno: Dict[str, List[Dict[str, Any]]] = {b: [] for b in matrix}
     for pdf in pdfs:
         try:
             rec = classify(pdf)
@@ -388,27 +432,41 @@ def main(argv: List[str]) -> int:
             print(f"skip {pdf}: {e}")
             continue
         buckets[rec["stratum"]].append(rec)
-    by_bucket: Dict[str, List[Dict[str, Any]]] = {}
-    for s in STRATA:
-        by_bucket.setdefault(bucket_of(s), []).extend(buckets[s])
+        for b in phenomena(rec["signals"], rec["signals"].get("images", 0),
+                           rec["signals"].get("words", 0)):
+            if b in pheno:
+                pheno[b].append(rec)
     quota_n = {b: int(need * q) for b, q in matrix.items()}
-    short = {b: quota_n[b] - len(by_bucket.get(b, [])) for b in quota_n
-             if len(by_bucket.get(b, [])) < quota_n[b]}
-    have = {b: len(by_bucket.get(b, [])) for b in quota_n}
+    short = {b: quota_n[b] - len(pheno[b]) for b in quota_n if len(pheno[b]) < quota_n[b]}
+    have = {b: len(pheno[b]) for b in quota_n}
     if short:
         print(f"INVALID corpus [{ACTIVE_MATRIX}]: shortfall {short} (have {have})")
         return 1
-    docs = []
+    import random
+    # Deterministic shuffle (seed 7) before quota slicing: directory order is
+    # vendor-clustered, and first-N slicing would over-fit dominant folders.
+    rng = random.Random(7)
+    by_path: Dict[str, Dict[str, Any]] = {}
     for b in quota_n:
-        for r in by_bucket[b][:quota_n[b]]:
-            r["bucket"] = b
-            r["sha256"] = sha256_file(Path(r["path"]))
-            docs.append(r)
+        pool = list(pheno[b])
+        rng.shuffle(pool)
+        for r in pool[:quota_n[b]]:
+            e = by_path.setdefault(r["path"], dict(r))
+            e.setdefault("buckets", [])
+            if b not in e["buckets"]:
+                e["buckets"].append(b)
+    docs = []
+    for e in by_path.values():
+        e["sha256"] = sha256_file(Path(e["path"]))
+        docs.append(e)
+    overlap = sum(len(e.get("buckets", [])) for e in docs) - len(docs)
     corpus_sha = hashlib.sha256("".join(sorted(r["sha256"] for r in docs)).encode()).hexdigest()
     manifest = {"need": need, "matrix": ACTIVE_MATRIX, "quota": quota_n,
+                "unique_docs": len(docs), "overlap_assignments": overlap,
                 "corpus_sha256": corpus_sha, "docs": docs}
     Path(argv[2]).write_text(json.dumps(manifest, indent=1), encoding="utf-8")
-    print(f"VALID corpus [{ACTIVE_MATRIX}]: {need} docs @ "
+    print(f"VALID corpus [{ACTIVE_MATRIX}]: {len(docs)} unique docs "
+          f"({overlap} multi-bucket) @ "
           + ", ".join(f"{b}={quota_n[b]}" for b in quota_n)
           + f" | corpus {corpus_sha[:16]}…")
     return 0

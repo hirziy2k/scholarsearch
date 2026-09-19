@@ -102,9 +102,15 @@ def _recompute(probes: Dict[str, Any], ink_floor: float, ssim_floor: float,
         return False
     if probes.get("ink_ratio", 0.0) > ink_floor:
         return False
-    if probes.get("drift_px", 0.0) > drift_cap:
+    drift = probes.get("drift_px", 0.0)
+    if drift is None:
+        return False  # unproven alignment fails closed (no-anchor/anchor-lost)
+    if drift > drift_cap:
         return False
-    if probes.get("ssim", 1.0) < ssim_floor:
+    ssim = probes.get("ssim", 1.0)
+    if ssim is None:
+        return False
+    if ssim < ssim_floor:
         return False
     return True
 
