@@ -374,8 +374,11 @@ def validate_field(field: Dict[str, Any], value: Any, source_text: str = "",
         if not meta:
             # no metadata: string match only, no pixel or boundary verdicts
             return validate_class_b(field, value, source_text)
-        bbox = _locate_run(value, words) or _locate_best_window(value, words)
-        if void_fn is not None and bbox is not None:
+        exact_run = _locate_run(value, words)
+        bbox = exact_run or _locate_best_window(value, words)
+        # Void localizes ONLY on exact runs: best-window bboxes span margins
+        # and fire on blank paper (measured false TAMPERING at 0.69+ void_frac).
+        if void_fn is not None and exact_run is not None:
             # Whiteout inversion runs before every other pixel verdict: a
             # synthetic void makes OCR and ink ratios meaningless. Probe
             # errors are no-evidence (other gates still apply), a positive is

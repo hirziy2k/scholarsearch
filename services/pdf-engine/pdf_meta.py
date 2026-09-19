@@ -230,32 +230,31 @@ def void_check(page: Any, bbox: Tuple[float, float, float, float],
                page_bg: Optional[Dict[str, float]] = None, dpi: int = 150,
                var_floor: float = 0.5, white_floor: float = 250.0,
                void_fraction: float = 0.20,
-               words: Optional[List[Dict[str, Any]]] = None) -> Tuple[bool, Dict[str, float]]:
+                words: Optional[List[Dict[str, Any]]] = None) -> Tuple[bool, Dict[str, float]]:
     """Zero-variance anomaly: whiteout looks like paper but has no noise.
 
-    Two triggers, either fail-closed:
-    (a) void ∩ claimed ink — any void cell intersecting a listed word rect
-        means the layer claims glyphs where pixels show synthetic perfection
-        (partial erasures: 1 cell suffices, no fraction needed);
-    (b) void fraction >= 20% — fully erased fields with no surviving rects.
-    Inter-word gaps never intersect word rects and sit ~10%, so clean copy
-    stays silent. Callers probe only bboxes where the layer claims content.
+    Trigger — void ERASING a word: a connected void component that (a) reaches
+    the word rect's interior central-third band, (b) covers >=400px^2 at 150dpi
+    (bigger than any glyph counter at body sizes; smaller than any word
+    erasure), and (c) touches >=2 rect edges (erasure spans; counters touch
+    none). Inter-word gaps fail (a); counters fail (b)+(c); line padding fails
+    (a). Measured path here: fringe-touch fired 500x on production gaps,
+    fraction bars proved uncalibratable, 50%-blanket missed a true positive
+    by 1%. No words = no verdict.
     """
     from PIL import Image
     import io
     pix = page.get_pixmap(clip=bbox, dpi=dpi)
     img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("L")
     W, H = img.size
-    if W == 0 or H == 0:
-        return False, {"void_frac": 0.0, "cells": 0}
+    if W == 0 or H == 0 or not words:
+        return False, {"void_cells": 0, "void_on_claim": False}
     vals = list(img.getdata())
     side = max(8, H // 2)
     nx = max(1, W // side)
     zoom = dpi / 72.0
     bx0, by0 = bbox[0], bbox[1]
-    void_cells = 0
-    hit_claim = False
-    total = 0
+    grid: Dict[tuple, bool] = {}
     for cx in range(nx):
         for cy in range(2):
             x0, y0 = cx * side, cy * (H // 2)
@@ -264,24 +263,39 @@ def void_check(page: Any, bbox: Tuple[float, float, float, float],
                     for dx in range(min(side, W - x0))]
             if not cell:
                 continue
-            total += 1
             mean = sum(cell) / len(cell)
             var = sum((v - mean) ** 2 for v in cell) / len(cell)
-            if var < var_floor and mean >= white_floor:
-                void_cells += 1
-                if words:
-                    # cell rect back in PDF pts; 1pt tolerance
-                    c = (bx0 + x0 / zoom - 1, by0 + y0 / zoom - 1,
-                         bx0 + (x0 + side) / zoom + 1, by0 + (y0 + H // 2) / zoom + 1)
-                    for w in words:
-                        if not (c[2] <= w["x0"] or w["x1"] <= c[0]
-                                or c[3] <= w["y0"] or w["y1"] <= c[1]):
-                            hit_claim = True
-                            break
-    frac = (void_cells / total) if total else 0.0
-    detail = {"void_frac": round(frac, 3), "cells": total,
-              "void_on_claim": hit_claim}
-    return (hit_claim or frac >= void_fraction), detail
+            grid[(cx, cy)] = bool(var < var_floor and mean >= white_floor)
+    seen = set()
+    for start, is_void in grid.items():
+        if not is_void or start in seen:
+            continue
+        stack, comp = [start], []
+        while stack:
+            node = stack.pop()
+            if node in seen or not grid.get(node, False):
+                continue
+            seen.add(node)
+            comp.append(node)
+            x, y = node
+            stack.extend([(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)])
+        xs = [c[0] for c in comp]
+        ys = [c[1] for c in comp]
+        c = (bx0 + min(xs) * side / zoom, by0 + min(ys) * (H // 2) / zoom,
+             bx0 + (max(xs) + 1) * side / zoom,
+             by0 + (max(ys) + 1) * (H // 2) / zoom)
+        area_px = len(comp) * side * (H // 2)
+        if area_px < 400:
+            continue
+        for w in words:
+            ix0, ix1 = w["x0"] + (w["x1"] - w["x0"]) / 3, w["x0"] + 2 * (w["x1"] - w["x0"]) / 3
+            if not (c[2] > ix0 and c[0] < ix1 and c[3] > w["y0"] and c[1] < w["y1"]):
+                continue
+            edges = sum((c[0] <= w["x0"] + 1, c[2] >= w["x1"] - 1,
+                         c[1] <= w["y0"] + 1, c[3] >= w["y1"] - 1))
+            if edges >= 2:
+                return True, {"void_cells": len(comp), "void_on_claim": True}
+    return False, {"void_cells": 0, "void_on_claim": False}
 
 
 def continuation_ink(page: Any, run_bbox: Tuple[float, float, float, float],
