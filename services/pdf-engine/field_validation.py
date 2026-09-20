@@ -221,11 +221,31 @@ def validate_class_a(field: Dict[str, Any], value: Any) -> Tuple[bool, str]:
     if ftype == "date":
         if not isinstance(value, str):
             return False, "date must be string"
+        v = value.strip()
         try:
-            datetime.fromisoformat(value)
+            datetime.fromisoformat(v)
             return True, "ok"
         except ValueError:
-            return False, f"date not ISO-8601: {value!r}"
+            pass
+        # Operational reality: M/D/YY and Malay-month forms dominate the
+        # liability surface; rejecting them is a bug, not strictness.
+        # Malaysian convention is day-first for ambiguous numerics.
+        malay = {"jan": "01", "feb": "02", "mac": "03", "apr": "04", "mei": "05",
+                 "jun": "06", "jul": "07", "ogos": "08", "sep": "09", "okt": "10",
+                 "nov": "11", "dis": "12"}
+        low = v.lower()
+        low = re.sub(r"(\d+)(st|nd|rd|th)\b", r"\1", low)  # ordinals: 15th -> 15
+        for k, num in malay.items():
+            low = re.sub(rf"\b{k}\b", num, low)
+        for fmt in ("%d/%m/%Y", "%d/%m/%y", "%m/%d/%Y", "%m/%d/%y",
+                    "%Y-%m-%d", "%d-%m-%Y", "%d %m %Y", "%d %m %y",
+                    "%B %Y", "%b %Y", "%m %Y", "%d %B %Y", "%d %b %Y"):
+            try:
+                datetime.strptime(re.sub(r"\s+", " ", low).strip(), fmt)
+                return True, f"ok (normalized {fmt})"
+            except ValueError:
+                continue
+        return False, f"date unparseable: {value!r}"
     if ftype == "boolean":
         return (True, "ok") if isinstance(value, bool) else (False, "boolean must be true/false")
     if ftype == "enum":
@@ -265,6 +285,29 @@ def validate_class_b(field: Dict[str, Any], value: Any, source_text: str) -> Tup
     return False, f"long verbatim overlap {ratio:.2f} < 0.85 -> REJECT:FUZZY_MISMATCH"
 
 
+def detect_layer_slip(value: str, source_text: str) -> Tuple[bool, str]:
+    """Duplicate-token slip: cheap-scanner layers ghost-duplicate words with
+    sub-pixel offsets. If the value's occurrence sits adjacent to an identical
+    token (case-insensitive, len>=3), the layer is slipping — fail-closed.
+    Genuine prose doubles ("had had") are rare; documented residual.
+    """
+    vt = _tokens(value)
+    if not vt:
+        return False, "ok"
+    toks = re.findall(r"[A-Za-z0-9]+", source_text)
+    low = [t.lower() for t in toks]
+    n = len(vt)
+    for i in range(len(low) - n + 1):
+        if low[i:i + n] != [t.lower() for t in vt]:
+            continue
+        if i > 0 and len(low[i - 1]) >= 3 and low[i - 1] == low[i]:
+            return True, f"{REJECT_TRUNCATION}: layer slip at {low[i]!r}"
+        j = i + n
+        if j < len(low) and len(low[j]) >= 3 and low[j] == low[j - 1]:
+            return True, f"{REJECT_TRUNCATION}: layer slip at {low[j]!r}"
+    return False, "ok"
+
+
 def _locate_run(value: str, words: List[Dict[str, Any]]) -> Optional[Tuple[float, float, float, float]]:
     """Union bbox of the value's token run. Matches at token level across the
     word stream, so single-word multi-token values ('$1,234.56' -> 1 word, 3
@@ -284,6 +327,20 @@ def _locate_run(value: str, words: List[Dict[str, Any]]) -> Optional[Tuple[float
             return (min(w["x0"] for w in run), min(w["y0"] for w in run),
                     max(w["x1"] for w in run), max(w["y1"] for w in run))
     return None
+
+
+def _psm_for(ftype: str, bbox: Optional[Tuple[float, float, float, float]],
+             words: List[Dict[str, Any]]) -> int:
+    """Adaptive PSM: single-token types -> 8; multi-line spans -> 6; else 7."""
+    if ftype in ("amount", "account_id", "alphanumeric_id"):
+        return 8
+    if bbox is not None:
+        lines = {w.get("line") for w in words
+                 if not (w["x1"] <= bbox[0] or w["x0"] >= bbox[2])
+                 and not (w["y1"] <= bbox[1] or w["y0"] >= bbox[3])}
+        if len(lines) > 1:
+            return 6
+    return 7
 
 
 def _locate_best_window(value: str, words: List[Dict[str, Any]]
@@ -368,6 +425,9 @@ def validate_field(field: Dict[str, Any], value: Any, source_text: str = "",
         ok, reason = quarantine_value(value)
         if not ok:
             return False, reason
+        slipped, why = detect_layer_slip(value, source_text)
+        if slipped:
+            return False, why
         meta = (spans is not None and fonts is not None and words is not None)
         if strict_meta and not meta:
             return False, REJECT_METADATA_MISSING
@@ -406,10 +466,11 @@ def validate_field(field: Dict[str, Any], value: Any, source_text: str = "",
         focal = _expand_to_line(bbox, words) if bbox else None
         if focal is None:
             return False, reason
-        try:
-            ocr_text, ocr_words = ocr_fn(focal)
-        except Exception as e:
-            return False, f"{REJECT_OCR_UNAVAILABLE}: {e}"
+        matched, _, ocr_text, ocr_words = _ocr_with_retry(ocr_fn, focal, field, value, words)
+        if not matched:
+            # Retry already exhausted inside; the layer stands accused by pixels too.
+            ok2, reason2 = validate_class_b(field, value, ocr_text) if ocr_text else (False, reason)
+            return False, reason + f" + focal OCR confirms: {reason2}"
         ok2, reason2 = quarantine_value(ocr_text)
         if not ok2:
             return False, reason2
@@ -422,6 +483,32 @@ def validate_field(field: Dict[str, Any], value: Any, source_text: str = "",
                 return False, reason2 + " [focal OCR]"
         return True, "ok [focal OCR, layer-degraded]"
     return False, f"unregistered field type: {ftype} -> {REJECT_METADATA_MISSING}"
+
+
+def _ocr_with_retry(ocr_fn: Optional[Callable], clip: Tuple[float, float, float, float],
+                    field: Dict[str, Any], value: str, words: List[Dict[str, Any]]
+                    ) -> Tuple[bool, str, str, List[Dict[str, Any]]]:
+    """OCR once; on mismatch retry once at 450dpi before failing. Returns
+    (matched, reason, ocr_text, ocr_words). A sensor deserves a second look
+    at higher resolution before its disagreement becomes a verdict."""
+    if ocr_fn is None:
+        return False, REJECT_OCR_UNAVAILABLE, "", []
+    base_psm = _psm_for(field.get("type", ""), clip, words)
+    try:
+        text, owords = ocr_fn(clip, psm=base_psm)
+    except Exception as e:
+        return False, f"{REJECT_OCR_UNAVAILABLE}: {e}", "", []
+    ok, reason = validate_class_b(field, value, text)
+    if ok:
+        return True, reason, text, owords
+    try:
+        text2, owords2 = ocr_fn(clip, psm=base_psm, dpi=450)
+    except Exception:
+        return False, reason, text, owords
+    ok2, reason2 = validate_class_b(field, value, text2)
+    if ok2:
+        return True, reason2 + " [retry450]", text2, owords2
+    return False, reason, text, owords
 
 
 def _ocr_path(field: Dict[str, Any], value: str, words: List[Dict[str, Any]],
@@ -442,11 +529,10 @@ def _ocr_path(field: Dict[str, Any], value: str, words: List[Dict[str, Any]],
             pass
     if ocr_fn is None:
         return False, REJECT_OCR_UNAVAILABLE
-    try:
-        clip = _expand_to_line(bbox, words) if bbox else (0, 0, 0, 0)
-        ocr_text, ocr_words = ocr_fn(clip)
-    except Exception as e:
-        return False, f"{REJECT_OCR_UNAVAILABLE}: {e}"
+    clip = _expand_to_line(bbox, words) if bbox else (0, 0, 0, 0)
+    matched, reason, ocr_text, ocr_words = _ocr_with_retry(ocr_fn, clip, field, value, words)
+    if not matched:
+        return False, reason + " [via OCR]"
     ok, reason = quarantine_value(ocr_text)
     if not ok:
         return False, reason

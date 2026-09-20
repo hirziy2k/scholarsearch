@@ -111,6 +111,45 @@ def build_meta(page: Any, doc: Any) -> Tuple[List[Dict[str, Any]], Dict[Any, Dic
     return spans, fonts, words
 
 
+def find_grid_cells(page: Any, words: List[Dict[str, Any]],
+                    min_line_pt: float = 20.0) -> Dict[str, Any]:
+    """Deterministic Grid Pre-Processor: explicit vertical vector borders plus
+    implicit whitespace corridors form hard cell boundaries that OVERRIDE
+    block assumptions. Returns {"vlines": [...], "hlines": [...]} sorted.
+    Ink probes cap at the containing cell edge — adjacent-column ink can never
+    read as continuation, even when the layout engine missed the gutter.
+    """
+    vlines, hlines = [], []
+    try:
+        for d in page.get_drawings():
+            for item in d.get("items", []):
+                pts = [p for p in item[1:] if isinstance(p, (list, tuple)) and len(p) == 2]
+                if len(pts) < 2:
+                    continue
+                (x0, y0), (x1, y1) = pts[0], pts[-1]
+                if abs(x1 - x0) < 1.0 and abs(y1 - y0) >= min_line_pt:
+                    vlines.append(round((x0 + x1) / 2, 1))
+                elif abs(y1 - y0) < 1.0 and abs(x1 - x0) >= min_line_pt:
+                    hlines.append(round((y0 + y1) / 2, 1))
+    except Exception:
+        pass
+    gutter_cols = find_columns(words, page.rect.width, page.rect.height)
+    edges = sorted(set(vlines + [a for a, _ in gutter_cols] + [b for _, b in gutter_cols]))
+    return {"vlines": sorted(set(vlines)), "hlines": sorted(set(hlines)),
+            "x_edges": edges}
+
+
+def grid_cap(grid: Dict[str, Any],
+             run_bbox: Tuple[float, float, float, float]) -> Optional[float]:
+    """Right edge of the grid cell containing the run center, or None."""
+    cx = (run_bbox[0] + run_bbox[2]) / 2
+    edges = grid.get("x_edges", [])
+    for a, b in zip(edges, edges[1:]):
+        if a <= cx <= b:
+            return b
+    return None
+
+
 def find_columns(words: List[Dict[str, Any]], page_width: float, page_height: float,
                  min_gutter_pt: float = 18.0) -> List[Tuple[float, float]]:
     """Vertical column gutters from word-rect topology (layout-bounded probing).
@@ -334,9 +373,12 @@ def continuation_ink(page: Any, run_bbox: Tuple[float, float, float, float],
 
 
 def ocr_field(page: Any, bbox: Tuple[float, float, float, float],
-              dpi: int = 300, pad_pt: float = 4.0) -> Tuple[str, List[Dict[str, Any]]]:
+              dpi: int = 300, pad_pt: float = 4.0, psm: Optional[int] = None) -> Tuple[str, List[Dict[str, Any]]]:
     """Isotope tracing: render ONLY the field bbox, OCR it, return (text, words).
 
+    Adaptive PSM (never default blindly): single token (amounts/IDs) -> 8,
+    single line -> 7, multi-line -> 6. Auto-detects from bbox aspect when the
+    caller passes psm=None (wide-flat clips read as single line).
     Bypasses a deceitful text layer entirely — verdicts downstream rest on
     pixels. Words carry PDF-coordinate rects rebuilt from image_to_data.
     Raises RuntimeError('OCR_UNAVAILABLE') when Tesseract is missing.
@@ -349,13 +391,16 @@ def ocr_field(page: Any, bbox: Tuple[float, float, float, float],
     x0, y0, x1, y1 = bbox
     clip = (x0 - pad_pt, y0 - pad_pt, x1 + pad_pt, y1 + pad_pt)
     zoom = dpi / 72.0
+    if psm is None:
+        # Aspect auto-detect: wide-flat clips are single lines.
+        psm = 7 if (x1 - x0) > 2 * max(1.0, (y1 - y0)) else 6
     pix = page.get_pixmap(clip=clip, dpi=dpi, colorspace="GRAY")
     import io
     img = Image.open(io.BytesIO(pix.tobytes("png")))
-    text = pytesseract.image_to_string(img, config="--psm 7")
+    text = pytesseract.image_to_string(img, config=f"--psm {psm}")
     words: List[Dict[str, Any]] = []
     try:
-        data = pytesseract.image_to_data(img, config="--psm 7", output_type=pytesseract.Output.DICT)
+        data = pytesseract.image_to_data(img, config=f"--psm {psm}", output_type=pytesseract.Output.DICT)
         n = len(data.get("text", []))
         for i in range(n):
             t = (data["text"][i] or "").strip()
