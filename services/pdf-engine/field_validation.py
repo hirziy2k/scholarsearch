@@ -104,13 +104,47 @@ def _bbox_intersects(a: Tuple[float, float, float, float],
     return not (a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1])
 
 
+def hull_status(source_text: str, fonts: Optional[Dict[Any, Dict[str, Any]]] = None) -> str:
+    """Page-hull integrity for the QUARANTINE_VALID tri-state. COMPROMISED if
+    the SOURCE carries mixed-script tokens, PUA codepoints, or a poisoned/
+    unverified font anywhere on the page — even when this field's own spans
+    are clean. A true value on a compromised hull passes (no starvation) but
+    commits downstream under cryptographic lock, never as clean."""
+    import unicodedata
+    import re as _re2
+    toks = _re2.findall(r"[A-Za-z0-9]+", source_text)
+    for a, b in zip(toks, toks[1:]):
+        if len(a) >= 4 and a.lower() == b.lower():
+            return "COMPROMISED"  # ghost-duplicate layer slip, even far from field
+    for token in source_text.split():
+        scripts = {unicodedata.name(ch, "").split(" ")[0]
+                   for ch in token if unicodedata.category(ch).startswith("L")}
+        if len(scripts) > 1:
+            return "COMPROMISED"
+    if any(unicodedata.category(ch) == "Co" for ch in source_text):
+        return "COMPROMISED"
+    for v in (fonts or {}).values():
+        if v.get("tounicode_letter_to_space") or (v.get("is_identity_h") and not v.get("tounicode_ok")):
+            return "COMPROMISED"
+    return "CLEAN"
+
+
 def field_span_verdict(field_bbox: Optional[Tuple[float, float, float, float]],
                        spans: List[Dict[str, Any]],
                        fonts: Dict[Any, Dict[str, Any]],
                        background: int = 0xFFFFFF) -> Tuple[str, str]:
     """Localize the tripwire to the field's spatial bbox. Returns
     ('clean'|'fallback', reason). Non-intersecting spans are ignored entirely —
-    a poisoned footer can never kill a clean entity (no page-level taint)."""
+    a poisoned footer can never kill a clean entity (no page-level taint).
+
+    Vector bypass: an UNTRACEABLE span name on a page with NO poisoned/
+    unverified-Identity fonts is benign producer aliasing (measured: base-14
+    substitution) — the native vector layer is trusted and raster OCR is
+    skipped. Only genuinely hostile encodings pay the OCR toll.
+    """
+    page_hostile = any(v.get("tounicode_letter_to_space")
+                       or (v.get("is_identity_h") and not v.get("tounicode_ok"))
+                       for v in fonts.values())
     hits = [sp for sp in spans
             if field_bbox is None or _bbox_intersects(field_bbox, sp.get("bbox", (0, 0, 0, 0)))]
     for sp in hits:
@@ -119,7 +153,9 @@ def field_span_verdict(field_bbox: Optional[Tuple[float, float, float, float]],
         if sp.get("color", 0) == background and background == 0xFFFFFF:
             return "fallback", f"{REJECT_TEXT_ATTR}: background-colored ink"
         if not sp.get("font_traced", False):
-            return "fallback", f"{REJECT_FONT_ENCODING}: untraceable font at field"
+            if page_hostile:
+                return "fallback", f"{REJECT_FONT_ENCODING}: untraceable font on tainted page"
+            continue  # benign aliasing: vector layer stands, no OCR toll
         finfo = fonts.get(sp.get("font_xref"), {})
         if finfo.get("tounicode_letter_to_space"):
             return "fallback", f"{REJECT_FONT_ENCODING}: ToUnicode letter->blank"
@@ -436,6 +472,11 @@ def validate_field(field: Dict[str, Any], value: Any, source_text: str = "",
             return validate_class_b(field, value, source_text)
         exact_run = _locate_run(value, words)
         bbox = exact_run or _locate_best_window(value, words)
+        # QUARANTINE_VALID tri-state: page-hull integrity rides on every pass
+        # verdict as a suffix tag. COMPROMISED hulls still pass true values
+        # (no starvation) but commit downstream under lock, never as clean.
+        hull = hull_status(source_text, fonts)
+        tag = "" if hull == "CLEAN" else " [hull:COMPROMISED]"
         # Void localizes ONLY on exact runs: best-window bboxes span margins
         # and fire on blank paper (measured false TAMPERING at 0.69+ void_frac).
         if void_fn is not None and exact_run is not None:
@@ -451,14 +492,15 @@ def validate_field(field: Dict[str, Any], value: Any, source_text: str = "",
                 pass
         verdict, _why = field_span_verdict(bbox, spans, fonts)
         if verdict == "fallback":
-            return _ocr_path(field, value, words, bbox, ocr_fn, ink_fn)
+            return _ocr_path(field, value, words, bbox, ocr_fn, ink_fn, hull=tag)
         # clean spans: trust the layer for matching, then verify
         bounded = ftype in ("proper_noun", "verbatim", "account_id", "alphanumeric_id")
         ok, reason = validate_class_b(field, value, source_text)
         if ok:
             if bounded:
-                return check_spatial_boundary(value, words)
-            return True, "ok"  # amounts: exact match + clean spans suffice
+                ok3, rs3 = check_spatial_boundary(value, words)
+                return (True, "ok" + tag) if ok3 else (False, rs3)
+            return True, "ok" + tag  # amounts: exact match + clean spans suffice
         # clean layer but mismatch: focal raster fallback decides — a poisoned
         # layer must never cast the deciding vote against a true extraction.
         if ocr_fn is None:
@@ -481,7 +523,7 @@ def validate_field(field: Dict[str, Any], value: Any, source_text: str = "",
             ok2, reason2 = check_spatial_boundary(value, ocr_words)
             if not ok2:
                 return False, reason2 + " [focal OCR]"
-        return True, "ok [focal OCR, layer-degraded]"
+        return True, "ok [focal OCR, layer-degraded]" + tag
     return False, f"unregistered field type: {ftype} -> {REJECT_METADATA_MISSING}"
 
 
@@ -515,7 +557,8 @@ def _ocr_path(field: Dict[str, Any], value: str, words: List[Dict[str, Any]],
               bbox: Optional[Tuple[float, float, float, float]],
               ocr_fn: Optional[Callable[[Tuple[float, float, float, float]],
                                         Tuple[str, List[Dict[str, Any]]]]],
-              ink_fn: Optional[Callable[[Tuple[float, float, float, float], float], bool]]
+              ink_fn: Optional[Callable[[Tuple[float, float, float, float], float], bool]],
+              hull: str = ""
               ) -> Tuple[bool, str]:
     """Tainted-field pixel path: ink probe first, then OCR re-verdict."""
     ftype = field["type"]
@@ -541,5 +584,5 @@ def _ocr_path(field: Dict[str, Any], value: str, words: List[Dict[str, Any]],
         return False, reason + " [via OCR]"
     if bounded:
         ok, reason = check_spatial_boundary(value, ocr_words)
-        return (ok, reason + " [via OCR]") if not ok else (True, "ok [via OCR]")
-    return True, "ok [via OCR]"
+        return (ok, reason + " [via OCR]") if not ok else (True, "ok [via OCR]" + hull)
+    return True, "ok [via OCR]" + hull
