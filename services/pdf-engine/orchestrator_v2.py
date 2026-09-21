@@ -90,6 +90,9 @@ class ConversionResult:
     warnings: List[str] = field(default_factory=list)
     mcp_augmented_pages: int = 0
     native_fallbacks: int = 0
+    rejection_ledger: List[Dict[str, Any]] = field(default_factory=list)
+    ledger_summary: Dict[str, Any] = field(default_factory=dict)
+    strict_status: str = "NOT_RUN"
 
 
 class ClusteringEngine:
@@ -395,6 +398,24 @@ async def convert_pdf(pdf_path: str, output_dir: Path, mcp_augment: bool = True,
             for page in doc.pages:
                 all_tables.extend(page.tables)
             valid_tables, fallback_tables = ValidationEngine.validate_tables(all_tables)
+
+        # Phase 4.8: Strict Gates + Rejection Ledger (behavioral enforcement)
+        try:
+            from strict_stage import run_strict_stage
+            with trace.start_span("strict_gates") if trace else None:
+                strict = run_strict_stage(sanitized_path)
+            result.rejection_ledger = strict["ledger"]
+            result.ledger_summary = strict["summary"]
+            result.strict_status = strict["summary"]["strict_status"]
+            s = strict["summary"]
+            result.warnings.append(
+                f"Strict: {s['strict_status']} pass={s['pass']} quar={s['quarantine']} "
+                f"reject={s['reject']} floors={s['floors']}")
+            for code, cnt in s["top_codes"][:5]:
+                result.warnings.append(f"Reject {cnt}x: {code}")
+        except Exception as e:
+            result.strict_status = "STAGE-CRASH"
+            result.warnings.append(f"Strict stage unavailable: {type(e).__name__}: {e}")
         
         # Phase 4.5: Semantic Classification (Theme Mapper)
         if THEME_MAPPER_AVAILABLE:
@@ -539,6 +560,7 @@ async def main():
     print(f"Success: {result.success}")
     print(f"Pages: {result.total_pages}, Slides: {result.total_slides}")
     print(f"MCP augmented: {result.mcp_augmented_pages}")
+    print(f"Strict: {result.strict_status} ledger={result.ledger_summary}")
     print(f"Time: {result.total_time_ms:.0f}ms")
     if result.errors:
         print(f"Errors: {result.errors}")

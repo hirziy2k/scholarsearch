@@ -31,15 +31,17 @@ ID_RE = re.compile(
     r"|\b\d{6,}\b")
 CONNECTORS = {"dan", "bin", "binti", "de", "di", "ke", "dalam", "dari", "&", "the", "of", "and", "for"}
 NOUN_RUN_RE = re.compile(
-    r"\b[A-Z][a-zA-Z']*(?:(?:\s+(?:[A-Z][a-zA-Z']*|dan|bin|binti|de|di|ke|dalam|dari|the|of|and|for|&))+)\b")
+    r"\b[A-Z][a-zA-Z']*(?:(?:\s+(?:[A-Z][a-zA-Z']*|\d+|dan|bin|binti|de|di|ke|dalam|dari|the|of|and|for|&))+)\b")
 
 
 def _spans(pattern: re.Pattern, text: str, ftype: str) -> List[Dict[str, Any]]:
     out = []
     for m in pattern.finditer(text):
-        v = m.group(0).strip(" .,;:")
+        # Single-line chunks only: embedded newlines forge bogus multi-line
+        # bboxes downstream (measured false TAMPERING on a lorem fragment).
+        v = re.sub(r"\s+", " ", m.group(0)).strip(" .,;:")
         if len(v) >= 2:
-            out.append({"text": v, "type": ftype, "span": (m.start(), m.end())})
+            out.append({"text": v, "type": ftype, "span": (m.start(), m.start() + len(v))})
     return out
 
 
