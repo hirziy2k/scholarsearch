@@ -28,8 +28,42 @@ import redis
 import sqlite3
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+SWARM_API_TOKEN = os.environ.get("SWARM_API_TOKEN", "")
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "swarm_state.sqlite")
 PORT = int(os.environ.get("SWARM_PORT", "8084"))
+BIND_HOST = os.environ.get("SWARM_HOST", "127.0.0.1")
+MAX_BODY_BYTES = 32 * 1024
+_RATE_BUCKET: dict = {}
+_RATE_LOCK = threading.Lock()
+
+
+def _require_redis_auth(url: str) -> None:
+    """Fail closed if Redis URL has no password (open redis://localhost:6379)."""
+    try:
+        from urllib.parse import urlparse as _up
+        u = _up(url)
+        if not u.password:
+            raise RuntimeError(
+                "Refusing open Redis (no password in REDIS_URL). "
+                "Set REDIS_URL=redis://:PASSWORD@127.0.0.1:6379/0 or SWARM_NO_REDIS=1."
+            )
+    except RuntimeError:
+        raise
+    except Exception as e:
+        raise RuntimeError(f"Invalid REDIS_URL: {e}")
+
+
+def _check_rate(ip: str, limit: int = 10, window: float = 60.0) -> bool:
+    now = time.time()
+    with _RATE_LOCK:
+        hits = _RATE_BUCKET.get(ip, [])
+        hits = [t for t in hits if now - t < window]
+        if len(hits) >= limit:
+            _RATE_BUCKET[ip] = hits
+            return False
+        hits.append(now)
+        _RATE_BUCKET[ip] = hits
+        return True
 
 
 def init_database():
@@ -87,6 +121,12 @@ class SwarmAPIHandler(BaseHTTPRequestHandler):
         """Suppress default logging."""
         pass
 
+    def _authed(self) -> bool:
+        if not SWARM_API_TOKEN:
+            return False
+        auth = self.headers.get("Authorization", "")
+        return auth == f"Bearer {SWARM_API_TOKEN}"
+
     def do_GET(self):
         """Handle GET requests."""
         parsed = urlparse(self.path)
@@ -94,7 +134,22 @@ class SwarmAPIHandler(BaseHTTPRequestHandler):
 
         if path == "/api/health":
             self.send_health()
-        elif path in ("/api/dlq", "/api/dlq/stats", "/api/mechanic/dlq"):
+            return
+        # Health is open; everything else requires Bearer auth (fail closed if no token configured).
+        if not self._authed():
+            self.send_response(401)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(b'{"error":"unauthorized"}')
+            return
+        if not _check_rate(self.client_address[0]):
+            self.send_response(429)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"error":"rate_limited"}')
+            return
+        if path in ("/api/dlq", "/api/dlq/stats", "/api/mechanic/dlq"):
             self.send_dlq_stats()
         elif path.startswith("/api/stream/"):
             query_hash = path.split("/")[-1]
@@ -104,12 +159,31 @@ class SwarmAPIHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """Handle POST requests."""
+        if not self._authed():
+            self.send_response(401)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(b'{"error":"unauthorized"}')
+            return
+        if not _check_rate(self.client_address[0]):
+            self.send_response(429)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"error":"rate_limited"}')
+            return
         parsed = urlparse(self.path)
         path = parsed.path
 
         if path == "/api/research":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+            except ValueError:
+                length = 0
+            if length > MAX_BODY_BYTES or length <= 0:
+                self.send_error(413, "Body too large or empty (max 32KB)")
+                return
+            body = self.rfile.read(length)
             self.handle_research(body)
         else:
             self.send_error(404, "Not Found")
@@ -345,10 +419,14 @@ class SwarmAPIHandler(BaseHTTPRequestHandler):
 
 def start_server():
     """Start the HTTP server."""
+    if not SWARM_API_TOKEN:
+        raise RuntimeError("Refusing to start without SWARM_API_TOKEN (fail closed). Set $env:SWARM_API_TOKEN first.")
+    if not os.environ.get("SWARM_NO_REDIS"):
+        _require_redis_auth(REDIS_URL)
     db = init_database()
     SwarmAPIHandler.db = db
 
-    server = HTTPServer(("0.0.0.0", PORT), SwarmAPIHandler)
+    server = HTTPServer((BIND_HOST, PORT), SwarmAPIHandler)
     print(f"Swarm Cascade API listening on port {PORT}")
     print(f"Health: http://localhost:{PORT}/api/health")
     print(f"Research: POST http://localhost:{PORT}/api/research")

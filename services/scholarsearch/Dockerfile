@@ -9,8 +9,8 @@ COPY . .
 
 RUN npm ci
 
-# Generate Prisma client bindings — db.ts imports @prisma/client directly.
-RUN npx prisma generate
+# Generate Prisma client bindings — schema lives in apps/server/prisma/.
+RUN npx prisma generate --schema=apps/server/prisma/schema.prisma
 
 # Build the server workspace and its workspace dependencies only.
 # turbo filter "..." suffix = "@scholarsearch/server plus everything it depends on".

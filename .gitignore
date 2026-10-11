@@ -96,3 +96,13 @@ Scoping_Review_Source_Audit_*.md
 
 # Redis Path 2 working copy (canonical ledger is .opencode/session-state.json)
 .opencode/swarm/redis.env.bak
+
+# ===== Clinical / curriculum docs — NEVER push to scholarsearch.git (PUBLIC) =====
+# Local-only: DIO / VUC / MQA / patient-adjacent material stays out of this remote.
+Malaysian\ DIO*.md
+VUC*.docx
+*Examination*.md
+data/
+output/
+*.sav
+*.csv

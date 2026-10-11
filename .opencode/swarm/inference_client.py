@@ -33,6 +33,21 @@ LOCAL_NUM_CTX = 4096
 LOCAL_MAX_PREDICT = 256
 LOCAL_NUM_PARALLEL = 1
 
+# OOM gate: host is CPU-only / 16GB (proven: mistral:7b 5.1GB->0.8GB free). Block large pulls by default.
+BLOCKED_MODEL_PATTERNS = ("7b", "8b", "13b", "27b", "32b", "70b", "qwen3", "qwen3.8", "glm-5", "hy4", "kimi", "mimo")
+ALLOW_LARGE = (os.environ.get("SWARM_ALLOW_LARGE") or "").strip() == "1"
+
+
+def _enforce_model_gate(model: str) -> None:
+    m = (model or "").lower()
+    if ALLOW_LARGE:
+        return
+    if any(p in m for p in BLOCKED_MODEL_PATTERNS):
+        raise RuntimeError(
+            f"Refusing large model '{model}' on 16GB CPU-only host (OOM proven). "
+            "Use qwen2.5:1.5b or set SWARM_ALLOW_LARGE=1 for manual override."
+        )
+
 
 def _gbnf_to_ollama_format() -> dict:
     """Convert GBNF to Ollama JSON format hint (Ollama grammar is modelfile-level; we enforce via prompt + regex validation)."""
@@ -82,6 +97,7 @@ class OllamaClient:
     ):
         self.base_url = (base_url or os.environ.get("SWARM_MODEL_URL") or "http://localhost:11434").rstrip("/")
         self.model = model or os.environ.get("SWARM_MODEL_NAME") or "qwen2.5:1.5b"
+        _enforce_model_gate(self.model)
         self.temperature = float(os.environ.get("SWARM_MODEL_TEMPERATURE", str(temperature)))
         self.timeout = timeout
 
