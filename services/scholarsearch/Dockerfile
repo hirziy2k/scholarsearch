@@ -7,6 +7,9 @@ WORKDIR /repo
 
 COPY . .
 
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
 RUN npm ci
 
 # Generate Prisma client bindings — schema lives in apps/server/prisma/.
