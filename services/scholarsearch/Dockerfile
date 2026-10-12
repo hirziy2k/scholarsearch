@@ -12,13 +12,17 @@ RUN npm ci
 # Generate Prisma client bindings — schema lives in apps/server/prisma/.
 RUN npx prisma generate --schema=apps/server/prisma/schema.prisma
 
+# Create SQLite tables (CI/test image; server boots via initDatabase before /health).
+ENV DATABASE_URL="file:/repo/apps/server/scholarsearch.db"
+RUN npx prisma db push --schema=apps/server/prisma/schema.prisma --skip-generate
+
 # Build the server workspace and its workspace dependencies only.
 # turbo filter "..." suffix = "@scholarsearch/server plus everything it depends on".
 RUN npx turbo run build --filter=@scholarsearch/server...
 
 FROM node:20-slim AS runtime
 
-ENV NODE_ENV=production PORT=3001 HOST=0.0.0.0
+ENV NODE_ENV=production PORT=3001 HOST=0.0.0.0 DATABASE_URL="file:/repo/apps/server/scholarsearch.db"
 
 WORKDIR /repo
 
