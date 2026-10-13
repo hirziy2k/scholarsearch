@@ -1,5 +1,5 @@
 ---
-name: manuscript-writing-review
+name: sciwrite
 description: >
   Use this skill when asked to review, edit, or improve the writing quality of a
   scientific or engineering manuscript. Triggers include: "review my writing,"

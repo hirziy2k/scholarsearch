@@ -78,6 +78,9 @@ batch_demo_live.txt
 .opencode/slide_state.sqlite.bak
 .opencode/swarm/swarm_state.sqlite.bak
 
+# Local config backups (superseded snapshots, never commit)
+opencode.json.bak-*
+
 # Session tracker working copy (canonical is .opencode/session-state.json)
 .opencode/skills/session-state.json
 

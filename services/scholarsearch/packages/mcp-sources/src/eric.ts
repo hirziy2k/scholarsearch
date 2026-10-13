@@ -15,7 +15,7 @@ export class EricClient implements SourceClient {
 
   async health(): Promise<boolean> {
     try {
-      const res = await fetchWithRetry(`${ERIC_BASE}/search?q=test&rows=1&format=json`, {
+      const res = await fetchWithRetry(`${ERIC_BASE}/?search=test&rows=1&format=json`, {
         timeout: 10000,
       });
       return res.ok;
@@ -31,7 +31,7 @@ export class EricClient implements SourceClient {
       await this.rateLimiter.acquire();
 
       const params = new URLSearchParams({
-        q: ctx.query,
+        search: ctx.query,
         rows: String(Math.min(ctx.maxResults, 100)),
         start: "0",
         format: "json",
@@ -45,7 +45,7 @@ export class EricClient implements SourceClient {
       }
 
       const searchRes = await fetchWithRetry(
-        `${ERIC_BASE}/search?${params.toString()}`,
+        `${ERIC_BASE}/?${params.toString()}`,
         { timeout: 30000 }
       );
 
