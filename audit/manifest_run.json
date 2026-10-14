@@ -1,0 +1,29 @@
+{
+  "backend": "local-cpu",
+  "compiler_type": "human_manual",
+  "context_token_count": 0,
+  "failure_class": "",
+  "git_commit": "a6585ee",
+  "grammar_hash": "b61b2fffe9e52881e8a535c07f4636059b6233df763ec94fcc822618aa0c8ed0",
+  "hardware_summary": "",
+  "input_hash": "c45d4522e1a9179186403625ad2afcacddd5cf529ea7b7a79b39b6b7922bf2b6",
+  "llama_cpp_version": "",
+  "model_id": "parser_manual",
+  "model_sha256": "22d1683640a51bf272471b637a8a9c25cea91f05f7a4c1ecf2c24e98a56accf8",
+  "output_token_count": 0,
+  "prompt_hash": "34b77605f6e1332e7be3a896cb535ef357d00d4450222cafe4e9137354bc7017",
+  "protocol_version": "v7.6",
+  "retrieval_manifest_hash": "",
+  "retrieval_span_hashes": [],
+  "run_id": "HWD-20260912-02",
+  "runtime_version": "",
+  "sampling_parameters": {
+    "mode": "deterministic-parser",
+    "seed": 42,
+    "temperature": 0.0
+  },
+  "schema_hash": "22d1683640a51bf272471b637a8a9c25cea91f05f7a4c1ecf2c24e98a56accf8",
+  "seed": 42,
+  "status": "success",
+  "timestamp": "2026-09-12T03:29:41.314658+00:00"
+}

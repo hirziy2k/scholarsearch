@@ -43,6 +43,7 @@ services/pdf-engine/branding_sample_report.html
 services/pdf-engine/test_results/
 services/pdf-engine/*.log
 services/pdf-engine/messy_test.pdf
+services/pdf-engine/messy_test_sanitized.pdf
 services/pdf-engine/src/
 services/pdf-engine/build/
 services/pdf-engine/dist/
@@ -78,6 +79,13 @@ batch_demo_live.txt
 .opencode/slide_state.sqlite.bak
 .opencode/swarm/swarm_state.sqlite.bak
 
+# Local config backups (superseded snapshots, never commit)
+opencode.json.bak-*
+
+# Accidental browser download snapshots
+cran_index.html
+r_index.html
+
 # Session tracker working copy (canonical is .opencode/session-state.json)
 .opencode/skills/session-state.json
 
@@ -96,3 +104,14 @@ Scoping_Review_Source_Audit_*.md
 
 # Redis Path 2 working copy (canonical ledger is .opencode/session-state.json)
 .opencode/swarm/redis.env.bak
+
+# ===== Clinical / curriculum docs — NEVER push to scholarsearch.git (PUBLIC) =====
+# Local-only: DIO / VUC / MQA / patient-adjacent material stays out of this remote.
+Malaysian\ DIO*.md
+VUC*.docx
+VUC*.md
+*Examination*.md
+data/
+output/
+*.sav
+*.csv

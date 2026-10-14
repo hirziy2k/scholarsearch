@@ -33,16 +33,12 @@ TEST_OUTPUT_DIR = Path("test_results")
 TEST_OUTPUT_DIR.mkdir(exist_ok=True)
 
 def _load_env_key() -> str:
-    """Read the OmniRoute API key from the env file (~/.omniroute/.env)."""
-    env_file = Path.home() / ".omniroute" / ".env"
-    try:
-        for line in env_file.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line.startswith("OMNIROUTE_API_KEY="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    except (OSError, ValueError):
-        return ""
-    return ""
+    """Read the OmniRoute API key from the process environment.
+
+    Never read ~/.omniroute/.env from disk: the key is injected at launch
+    from the password-locked SecretStore (see Start-OpenCodeSafe / ocs).
+    """
+    return os.environ.get("OMNIROUTE_API_KEY", "")
 
 
 @dataclass
@@ -390,9 +386,9 @@ async def test_omniroute_api():
     print("\n[4] OMNIRoute API TESTS")
     print("-" * 60)
     
-    API_KEY = os.environ.get("OMNIROUTE_API_KEY", "") or _load_env_key()
+    API_KEY = os.environ.get("OMNIROUTE_API_KEY", "")
     if not API_KEY:
-        print("  SKIP: OMNIROUTE_API_KEY not set (see ~/.omniroute/.env)")
+        print("  SKIP: OMNIROUTE_API_KEY not set (inject via ocs/SecretStore)")
         print("  " + "-" * 60)
         return
     BASE_URL = os.environ.get("OMNIROUTE_BASE_URL", "http://127.0.0.1:20128")

@@ -58,8 +58,11 @@ class MCPAugmentor:
                 text = item.get("text", "")
                 if "structured_content=" in text:
                     try:
+                        import ast
                         json_str = text.split("structured_content=")[1].split(" is_error")[0]
-                        return eval(json_str) if isinstance(json_str, str) else json_str
+                        parsed = ast.literal_eval(json_str) if isinstance(json_str, str) else json_str
+                        if isinstance(parsed, dict):
+                            return parsed
                     except Exception:
                         pass
                 try:

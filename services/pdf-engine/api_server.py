@@ -644,4 +644,4 @@ if AUTH_PROXY_AVAILABLE:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("api_server:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("api_server:app", host=os.environ.get("PDF_ENGINE_HOST", "127.0.0.1"), port=8000, reload=True)

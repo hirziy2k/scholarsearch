@@ -24,6 +24,7 @@ jobs:
           cache: "npm"
           cache-dependency-path: services/scholarsearch/package-lock.json
       - run: npm ci
+      - run: npx prisma generate --schema=apps/server/prisma/schema.prisma
       - run: npm run build
 
   unit-tests:
@@ -40,6 +41,8 @@ jobs:
           cache: "npm"
           cache-dependency-path: services/scholarsearch/package-lock.json
       - run: npm ci
+      - run: npx prisma generate --schema=apps/server/prisma/schema.prisma
+      - run: npx turbo run build
       - run: npx vitest run
 
   e2e-contract-gate:

@@ -13,7 +13,7 @@ A headless, self-healing state machine that bridges PDF ingestion, scenario comp
 
 | Component | Port | Purpose | Status |
 |-----------|------|---------|--------|
-| OmniRoute | 20128 | LLM fleet (oc/hy3-free primary) | Active |
+| OmniRoute | 20128 | LLM fleet (oc/gemini-combo primary — create this route in /home) | Active |
 | HITL | 8081 | Human-in-the-loop command center | Active |
 | Export API | 8082 | Distributed HITL REST API | Active |
 | Orchestrator | 8083 | Unified Intelligence Engine (`orchestrate.py`, legacy primary) | Active |
@@ -145,8 +145,8 @@ A headless, self-healing state machine that bridges PDF ingestion, scenario comp
 
 ## Key Configuration
 
-- **API Key**: `oma_live_1rczQUSkElshykDzRaZkA4iHmz95trFEqO9UutWsIJM` (env: `OMNIROUTE_API_KEY`)
-- **Default Model**: `oc/hy3-free` (pinned for stateful work)
+- **API Key**: `oma_live_REDACTED_EXAMPLE` (env: `$env:OMNIROUTE_API_KEY` in PowerShell — rotate immediately if live key was committed)
+- **Default Model**: `oc/gemini-combo` (pinned for stateful work — must match route name in /home)
 - **DB**: `slide_state.sqlite` (WAL mode, `PRAGMA busy_timeout=10000`)
 - **Buffer TTL**: 300s (Volatile Decay Edict)
 - **Emergency Credit**: 50 tokens per cycle

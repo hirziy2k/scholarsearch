@@ -1,53 +1,48 @@
 {
-  "current_objective": "v1.0.0 baseline secured — hotfix merged, cleanup complete, all YELLOW items resolved",
+  "current_objective": "Stable - audit fixes committed and pushed, zero blockers",
   "modified_infrastructure": [
     {
-      "path": "services/scholarsearch/Dockerfile",
-      "last_edit": "2026-09-11T03:28:11.358734+00:00",
-      "change_description": "Injected npx prisma generate before turbo build"
+      "path": "COMPREHENSIVE_AUDIT_POST_REMEDIATION.md",
+      "last_edit": "2026-09-13T00:00:00.000000+00:00",
+      "change_description": "Post-remediation audit report"
     },
     {
-      "path": "services/scholarsearch/packages/shared/src/utils/ranking.ts",
-      "last_edit": "2026-09-11T03:28:15.863702+00:00",
-      "change_description": "Patched clinical and citation_verification weights from all-zeros to sum=1.00"
+      "path": ".opencode/skills/sciwrite/SKILL.md",
+      "last_edit": "2026-10-12T08:43:51.738204+00:00",
+      "change_description": "Fixed skill name to match folder"
     },
     {
-      "path": "services/scholarsearch/apps/server/src/services/search-orchestrator.ts",
-      "last_edit": "2026-09-11T03:28:22.353941+00:00",
-      "change_description": "Changed local AST intersection from title-only to title+abstract"
+      "path": ".opencode/CONFIG.md",
+      "last_edit": "2026-10-12T08:43:51.821781+00:00",
+      "change_description": "Fixed rules and skills docs drift"
     },
     {
-      "path": "services/scholarsearch/apps/server/src/services/session-manager.ts",
-      "last_edit": "2026-09-11T03:28:22.872843+00:00",
-      "change_description": "Added schema v2 quarantine for poisoned zero-weight sessions"
+      "path": "opencode.json",
+      "last_edit": "2026-10-12T09:17:49.161938+00:00",
+      "change_description": "Added redis.env read-deny rules"
     },
     {
-      "path": "services/scholarsearch/apps/server/prisma/schema.prisma",
-      "last_edit": "2026-09-11T03:28:23.480021+00:00",
-      "change_description": "Added schemaVersion Int field with default 2"
+      "path": "services/scholarsearch/packages/mcp-sources/src/eric.ts",
+      "last_edit": "2026-10-13T11:24:03.318154+00:00",
+      "change_description": "Fixed ERIC API path and search param"
     },
     {
-      "path": "services/scholarsearch/apps/server/src/__tests__/correctness-integrity.test.ts",
-      "last_edit": "2026-09-11T03:28:24.036747+00:00",
-      "change_description": "New vitest regression suite for clinical weights and intersection recall"
+      "path": "opencode.json",
+      "last_edit": "2026-10-13T19:19:17.534435+00:00",
+      "change_description": "Pinned MCP versions mcp-pdf 2.3.0 pptx 0.0.27"
     },
     {
-      "path": ".github/workflows/ci-scholarsearch.yml",
-      "last_edit": "2026-09-11T03:28:24.553788+00:00",
-      "change_description": "Added unit-tests job running vitest"
-    },
-    {
-      "path": "README.md",
-      "last_edit": "2026-09-11T03:28:25.122000+00:00",
-      "change_description": "Fixed ScholarSearch stack description from PostgreSQL to SQLite"
+      "path": ".gitignore",
+      "last_edit": "2026-10-13T23:58:43.423798+00:00",
+      "change_description": "Ignore local opencode.json backups"
     }
   ],
   "active_blockers": [],
-  "next_action_trigger": "npm run build --workspace=services/scholarsearch",
+  "next_action_trigger": "Review sw.js churn and Dependabot alerts on default branch",
   "meta": {
     "schema_version": "1.0.0",
-    "last_updated": "2026-09-11T03:28:30.438122+00:00",
-    "session_count": 0,
-    "total_tokens_saved": 0
+    "last_updated": "2026-10-13T23:58:43.580928+00:00",
+    "session_count": 9,
+    "total_tokens_saved": 50000
   }
 }

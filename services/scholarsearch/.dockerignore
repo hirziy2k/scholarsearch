@@ -53,6 +53,5 @@ docker-compose.yml
 # Session state
 .opencode
 
-# Monorepo root files (not needed in builds)
-turbo.json
+# Monorepo root files (turbo.json REQUIRED — Dockerfile runs npx turbo)
 pnpm-workspace.yaml

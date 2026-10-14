@@ -20,9 +20,10 @@ export async function initDatabase(): Promise<PrismaClient> {
   if (initialized) return prisma;
 
   if (isSQLite) {
-    await prisma.$executeRawUnsafe("PRAGMA journal_mode=WAL");
-    await prisma.$executeRawUnsafe("PRAGMA busy_timeout=5000");
-    await prisma.$executeRawUnsafe("PRAGMA synchronous=NORMAL");
+    // PRAGMAs return rows in SQLite -> must use $queryRawUnsafe ($executeRaw rejects result-returning statements).
+    await prisma.$queryRawUnsafe("PRAGMA journal_mode=WAL");
+    await prisma.$queryRawUnsafe("PRAGMA busy_timeout=5000");
+    await prisma.$queryRawUnsafe("PRAGMA synchronous=NORMAL");
   }
 
   initialized = true;

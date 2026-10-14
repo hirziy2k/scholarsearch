@@ -11,8 +11,10 @@ Supports:
 Env:
   SWARM_MODEL_CLIENT=ollama|llamacpp|mock  (default: mock)
   SWARM_MODEL_URL=http://localhost:11434   (ollama) or http://localhost:8080 (llamacpp)
-  SWARM_MODEL_NAME=mistral:7b-instruct     (ollama) or /path/to/model.gguf (llamacpp: no-op)
+  SWARM_MODEL_NAME=qwen2.5:1.5b            (ollama default; mistral:7b-instruct only as manual override)
   SWARM_MODEL_TEMPERATURE=0.1
+  OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 (host concurrency caps: queue depth 1,
+    single parallel request, num_ctx=4096, num_predict<=256 — prevents OOM paging on 16GB CPU-only host)
 """
 
 import json
@@ -23,6 +25,28 @@ import urllib.error
 from typing import Optional
 
 from .blind_matrix import GBNF_GRAMMAR
+
+
+# Local-pipeline concurrency caps (measured: qwen2.5:1.5b 1.2GB resident vs mistral:7b 5.0GB).
+# Single parallel request, queue depth 1 (busy callers get 503-style retry, never pile up).
+LOCAL_NUM_CTX = 4096
+LOCAL_MAX_PREDICT = 256
+LOCAL_NUM_PARALLEL = 1
+
+# OOM gate: host is CPU-only / 16GB (proven: mistral:7b 5.1GB->0.8GB free). Block large pulls by default.
+BLOCKED_MODEL_PATTERNS = ("7b", "8b", "13b", "27b", "32b", "70b", "qwen3", "qwen3.8", "glm-5", "hy4", "kimi", "mimo")
+ALLOW_LARGE = (os.environ.get("SWARM_ALLOW_LARGE") or "").strip() == "1"
+
+
+def _enforce_model_gate(model: str) -> None:
+    m = (model or "").lower()
+    if ALLOW_LARGE:
+        return
+    if any(p in m for p in BLOCKED_MODEL_PATTERNS):
+        raise RuntimeError(
+            f"Refusing large model '{model}' on 16GB CPU-only host (OOM proven). "
+            "Use qwen2.5:1.5b or set SWARM_ALLOW_LARGE=1 for manual override."
+        )
 
 
 def _gbnf_to_ollama_format() -> dict:
@@ -72,12 +96,14 @@ class OllamaClient:
         timeout: int = 120,
     ):
         self.base_url = (base_url or os.environ.get("SWARM_MODEL_URL") or "http://localhost:11434").rstrip("/")
-        self.model = model or os.environ.get("SWARM_MODEL_NAME") or "mistral:7b-instruct"
+        self.model = model or os.environ.get("SWARM_MODEL_NAME") or "qwen2.5:1.5b"
+        _enforce_model_gate(self.model)
         self.temperature = float(os.environ.get("SWARM_MODEL_TEMPERATURE", str(temperature)))
         self.timeout = timeout
 
     def generate(self, prompt: str, grammar: str = GBNF_GRAMMAR, max_tokens: int = 512, temperature: float = 0.1) -> str:
         temp = float(temperature) if temperature is not None else self.temperature
+        max_tokens = min(int(max_tokens), LOCAL_MAX_PREDICT)
         # Enforce GBNF via prompt — do NOT use format=json (GBNF is plain "1 boundary", not JSON)
         gbnf_instruction = (
             "\n\nSTRICT OUTPUT: Reply with exactly one line in GBNF format: '<category 1-4> <boundary 1-250 chars>'"
@@ -89,7 +115,7 @@ class OllamaClient:
             "model": self.model,
             "prompt": full_prompt,
             "stream": False,
-            "options": {"temperature": temp, "num_predict": max_tokens},
+            "options": {"temperature": temp, "num_predict": max_tokens, "num_ctx": LOCAL_NUM_CTX},
         }).encode()
         req = urllib.request.Request(f"{self.base_url}/api/generate", data=body, headers={"Content-Type": "application/json"})
         try:
@@ -169,7 +195,7 @@ def get_model_client():
     """
     kind = (os.environ.get("SWARM_MODEL_CLIENT") or "mock").lower()
     if kind == "ollama":
-        return OllamaClient(), f"ollama:{os.environ.get('SWARM_MODEL_NAME','mistral:7b-instruct')}@{os.environ.get('SWARM_MODEL_URL','http://localhost:11434')}"
+        return OllamaClient(), f"ollama:{os.environ.get('SWARM_MODEL_NAME','qwen2.5:1.5b')}@{os.environ.get('SWARM_MODEL_URL','http://localhost:11434')}"
     if kind in ("llamacpp", "llama.cpp", "llama_cpp"):
         return LlamaCppClient(), f"llamacpp@{os.environ.get('SWARM_MODEL_URL','http://localhost:8080')}"
     return MockModelClient(), "mock"

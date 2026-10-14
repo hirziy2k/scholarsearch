@@ -1,0 +1,588 @@
+#!/usr/bin/env python3
+"""field_validation.py — Class A/B compliance field registry (V1 Data Guillotine).
+
+Class A (structural): dates, booleans, enums, OCR-reconstructed paragraphs,
+    summaries. Strict JSON-schema typing + enum enforcement. Zero source-text matching.
+Class B (verbatim): financial amounts, account numbers, proper nouns,
+    alphanumeric IDs. Token-overlap against sliding source window + deterministic
+    normalization. Failures route to orange-review (human HITL), never auto-accept.
+
+Thresholds (signed off, length-aware — no universal 0.85):
+  amounts & alphanumeric IDs : 1.0 exact after normalization (no fuzzy numbers)
+  short proper nouns (<=4 tokens): 1.0 exact, case-normalized
+  long verbatim (>4 tokens)  : token-overlap >= 0.85 sliding window
+
+Stdlib only.
+"""
+
+import re
+import unicodedata
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+# ---------------------------------------------------------------------------
+# First line of defense: pre-prompt injection redaction (LLM-input copy only;
+# original preserved in provenance store).
+# ---------------------------------------------------------------------------
+
+INJECTION_PATTERNS = [
+    re.compile(r"\b(ignore|disregard)\s+(all\s+)?(previous|prior|above)\s+instructions?\b", re.I),
+    re.compile(r"\bsystem\s*prompt\b", re.I),
+    re.compile(r"\badmin\s*password\b", re.I),
+    re.compile(r"\breveal\s+(credentials|keys|password|secrets?)\b", re.I),
+    re.compile(r"\bexfiltrate\b", re.I),
+    re.compile(r"\bsend\s+to\s+https?://\S+", re.I),
+]
+
+REDACTED = "[REDACTED-INSTRUCTION]"
+
+
+def redact_for_prompt(text: str) -> Tuple[str, int]:
+    """Return (redacted_copy, hit_count). Never mutates the stored original."""
+    hits = 0
+    out = text
+    for pat in INJECTION_PATTERNS:
+        out, n = pat.subn(REDACTED, out)
+        hits += n
+    return out, hits
+
+
+# ---------------------------------------------------------------------------
+# Registry
+# ---------------------------------------------------------------------------
+
+CLASS_A_TYPES = {"date", "boolean", "enum", "ocr_paragraph", "summary"}
+CLASS_B_TYPES = {"amount", "account_id", "alphanumeric_id", "proper_noun", "verbatim"}
+
+ORANGE_REVIEW = "orange-review"  # legacy label; zero-review pipeline uses REJECT:* codes
+
+# Zero-review reject codes (fail-closed, machine-readable, no human queue).
+REJECT_METADATA_MISSING = "REJECT:METADATA_MISSING"
+REJECT_TEXT_ATTR = "REJECT:SUSPECT_TEXT_ATTR"
+REJECT_FONT_ENCODING = "REJECT:SUSPECT_FONT_ENCODING"
+REJECT_TRUNCATION = "REJECT:TRUNCATION_BOUNDARY"
+REJECT_HOSTILE_UNICODE = "REJECT:HOSTILE_UNICODE"
+REJECT_OCR_UNAVAILABLE = "REJECT:OCR_UNAVAILABLE"
+REJECT_DOCUMENT_TAMPERING = "REJECT:SUSPECT_DOCUMENT_TAMPERING"
+
+MIN_FONT_PT = 6.0
+STANDARD_ENCODINGS = {"WinAnsiEncoding", "MacRomanEncoding", "StandardEncoding"}
+WORD_RE = re.compile(r"[A-Za-z0-9]+")
+ADJACENCY_LINE_FACTOR = 1.5  # neighbor within 1.5x line height counts as adjacent
+
+
+def quarantine_value(value: str) -> Tuple[bool, str]:
+    """Homoglyph & PUA quarantine, scoped per whitespace-delimited token.
+
+    Rules: NFKC must be identity (no compat games); no Private-Use (Co);
+    letters within ONE token must share a single script (Latin 'a' + Cyrillic
+    'e' in one token is hostile). A fully non-Latin token elsewhere (Jawi
+    header, Chinese stamp) is legitimate context — matching decides it.
+    Class B only. Fail-closed.
+    """
+    if not isinstance(value, str):
+        return False, f"{REJECT_HOSTILE_UNICODE}: non-string"
+    norm = unicodedata.normalize("NFKC", value)
+    if norm != value:
+        return False, f"{REJECT_HOSTILE_UNICODE}: NFKC shift {value!r} -> {norm!r}"
+    for token in value.split():
+        scripts = set()
+        for ch in token:
+            cat = unicodedata.category(ch)
+            if cat == "Co":
+                return False, f"{REJECT_HOSTILE_UNICODE}: private-use U+{ord(ch):04X}"
+            if cat.startswith("L"):
+                scripts.add(unicodedata.name(ch, "").split(" ")[0])
+        if len(scripts) > 1:
+            return False, (f"{REJECT_HOSTILE_UNICODE}: mixed scripts in token "
+                           f"{token!r} {sorted(scripts)}")
+    return True, "ok"
+
+
+def _bbox_intersects(a: Tuple[float, float, float, float],
+                     b: Tuple[float, float, float, float]) -> bool:
+    return not (a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1])
+
+
+def hull_status(source_text: str, fonts: Optional[Dict[Any, Dict[str, Any]]] = None) -> str:
+    """Page-hull integrity for the QUARANTINE_VALID tri-state. COMPROMISED if
+    the SOURCE carries mixed-script tokens, PUA codepoints, or a poisoned/
+    unverified font anywhere on the page — even when this field's own spans
+    are clean. A true value on a compromised hull passes (no starvation) but
+    commits downstream under cryptographic lock, never as clean."""
+    import unicodedata
+    import re as _re2
+    toks = _re2.findall(r"[A-Za-z0-9]+", source_text)
+    for a, b in zip(toks, toks[1:]):
+        if len(a) >= 4 and a.lower() == b.lower():
+            return "COMPROMISED"  # ghost-duplicate layer slip, even far from field
+    for token in source_text.split():
+        scripts = {unicodedata.name(ch, "").split(" ")[0]
+                   for ch in token if unicodedata.category(ch).startswith("L")}
+        if len(scripts) > 1:
+            return "COMPROMISED"
+    if any(unicodedata.category(ch) == "Co" for ch in source_text):
+        return "COMPROMISED"
+    for v in (fonts or {}).values():
+        if v.get("tounicode_letter_to_space") or (v.get("is_identity_h") and not v.get("tounicode_ok")):
+            return "COMPROMISED"
+    return "CLEAN"
+
+
+def field_span_verdict(field_bbox: Optional[Tuple[float, float, float, float]],
+                       spans: List[Dict[str, Any]],
+                       fonts: Dict[Any, Dict[str, Any]],
+                       background: int = 0xFFFFFF) -> Tuple[str, str]:
+    """Localize the tripwire to the field's spatial bbox. Returns
+    ('clean'|'fallback', reason). Non-intersecting spans are ignored entirely —
+    a poisoned footer can never kill a clean entity (no page-level taint).
+
+    Vector bypass: an UNTRACEABLE span name on a page with NO poisoned/
+    unverified-Identity fonts is benign producer aliasing (measured: base-14
+    substitution) — the native vector layer is trusted and raster OCR is
+    skipped. Only genuinely hostile encodings pay the OCR toll.
+    """
+    page_hostile = any(v.get("tounicode_letter_to_space")
+                       or (v.get("is_identity_h") and not v.get("tounicode_ok"))
+                       for v in fonts.values())
+    hits = [sp for sp in spans
+            if field_bbox is None or _bbox_intersects(field_bbox, sp.get("bbox", (0, 0, 0, 0)))]
+    for sp in hits:
+        if sp.get("size", MIN_FONT_PT) < MIN_FONT_PT:
+            return "fallback", f"{REJECT_TEXT_ATTR}: size {sp.get('size')}pt"
+        if sp.get("color", 0) == background and background == 0xFFFFFF:
+            return "fallback", f"{REJECT_TEXT_ATTR}: background-colored ink"
+        if not sp.get("font_traced", False):
+            if page_hostile:
+                return "fallback", f"{REJECT_FONT_ENCODING}: untraceable font on tainted page"
+            continue  # benign aliasing: vector layer stands, no OCR toll
+        finfo = fonts.get(sp.get("font_xref"), {})
+        if finfo.get("tounicode_letter_to_space"):
+            return "fallback", f"{REJECT_FONT_ENCODING}: ToUnicode letter->blank"
+        if finfo.get("is_identity_h") and not finfo.get("tounicode_ok"):
+            return "fallback", f"{REJECT_FONT_ENCODING}: unverified Identity-H"
+        enc = finfo.get("encoding", "")
+        if enc and enc not in STANDARD_ENCODINGS:
+            return "fallback", f"{REJECT_FONT_ENCODING}: {enc}"
+    return "clean", "ok"
+
+
+def check_spatial_boundary(value: str, words: List[Dict[str, Any]]) -> Tuple[bool, str]:
+    """Bidirectional boundary over reading-order word adjacency (no pixel ratios).
+
+    Finds the value's token run in word order; if the immediately adjacent word
+    (same block by word number, else nearest rect within line-height factor) is
+    alphanumeric, the extraction is truncated -> fail-closed.
+    """
+    vt = _tokens(value)
+    if not vt:
+        return False, f"{REJECT_TRUNCATION}: empty value"
+    seq = [w for w in words]
+    n = len(vt)
+    best = -1
+    for i in range(len(seq) - n + 1):
+        if [t for t in _tokens(" ".join(w["text"] for w in seq[i:i + n]))] == vt:
+            best = i
+            break
+    if best < 0:
+        # no contiguous run (fuzzy-accepted long text): boundary check n/a
+        return True, "ok"
+    run = seq[best:best + n]
+    first, last = run[0], run[-1]
+    neighbors: List[Dict[str, Any]] = []
+    # Rule 1: same (block, line) word-number adjacency — catches same-line drops.
+    same_line = [w for w in seq if w.get("block") == first.get("block")
+                 and w.get("line") == first.get("line")]
+    ordered = sorted(same_line, key=lambda w: w.get("wno", 0))
+    idx = [i for i, w in enumerate(ordered)
+           if (w["x0"], w["y0"]) == (first["x0"], first["y0"])]
+    if idx:
+        p = idx[0]
+        if p > 0:
+            neighbors.append(ordered[p - 1])
+        last_idx = [i for i, w in enumerate(ordered)
+                    if (w["x0"], w["y0"]) == (last["x0"], last["y0"])]
+        if last_idx and last_idx[0] + 1 < len(ordered):
+            neighbors.append(ordered[last_idx[0] + 1])
+    # Rule 2: same visual line, split across blocks (column gutter split only).
+    # Requires baseline gap < 0.5x line height AND small horizontal gap —
+    # next-line words are NEVER neighbors (wrap handling belongs to extraction).
+    lh = max(1.0, last["y1"] - last["y0"])
+    for w in seq:
+        if w in run or w.get("line") == last.get("line") and w.get("block") == last.get("block"):
+            continue
+        dy = abs((w["y1"] + w["y0"]) / 2 - (last["y1"] + last["y0"]) / 2)
+        gap = w["x0"] - last["x1"]  # qualifier to the right of the run
+        gap_left = first["x0"] - w["x1"]  # qualifier to the left
+        if dy < 0.5 * lh and (0 <= gap < 3 * lh or 0 <= gap_left < 3 * lh):
+            neighbors.append(w)
+    for nb in neighbors:
+        if WORD_RE.search(nb["text"]):
+            return False, f"{REJECT_TRUNCATION}: adjacent token {nb['text']!r}"
+    return True, "ok"
+
+
+def _tokens(s: str) -> List[str]:
+    return re.findall(r"[A-Za-z0-9]+", s.lower())
+
+
+def normalize_amount(s: str) -> str:
+    """Strip currency symbols, commas, whitespace. Keeps digits, '.', '-'."""
+    return re.sub(r"[^0-9.\-]", "", s)
+
+
+def sliding_overlap(value_tokens: List[str], source_tokens: List[str]) -> float:
+    """Max token-overlap of value against any contiguous source window of equal length."""
+    n = len(value_tokens)
+    if n == 0:
+        return 1.0
+    if len(source_tokens) < n:
+        hit = sum(1 for t in value_tokens if t in set(source_tokens))
+        return hit / n
+    best = 0.0
+    for i in range(len(source_tokens) - n + 1):
+        window = set(source_tokens[i:i + n])
+        hit = sum(1 for t in value_tokens if t in window)
+        ratio = hit / n
+        if ratio > best:
+            best = ratio
+            if best >= 1.0:
+                break
+    return best
+
+
+def validate_class_a(field: Dict[str, Any], value: Any) -> Tuple[bool, str]:
+    """Schema typing only. No source-text matching by design."""
+    ftype = field["type"]
+    if ftype == "date":
+        if not isinstance(value, str):
+            return False, "date must be string"
+        v = value.strip()
+        try:
+            datetime.fromisoformat(v)
+            return True, "ok"
+        except ValueError:
+            pass
+        # Operational reality: M/D/YY and Malay-month forms dominate the
+        # liability surface; rejecting them is a bug, not strictness.
+        # Malaysian convention is day-first for ambiguous numerics.
+        malay = {"jan": "01", "feb": "02", "mac": "03", "apr": "04", "mei": "05",
+                 "jun": "06", "jul": "07", "ogos": "08", "sep": "09", "okt": "10",
+                 "nov": "11", "dis": "12"}
+        low = v.lower()
+        low = re.sub(r"(\d+)(st|nd|rd|th)\b", r"\1", low)  # ordinals: 15th -> 15
+        for k, num in malay.items():
+            low = re.sub(rf"\b{k}\b", num, low)
+        for fmt in ("%d/%m/%Y", "%d/%m/%y", "%m/%d/%Y", "%m/%d/%y",
+                    "%Y-%m-%d", "%d-%m-%Y", "%d %m %Y", "%d %m %y",
+                    "%B %Y", "%b %Y", "%m %Y", "%d %B %Y", "%d %b %Y"):
+            try:
+                datetime.strptime(re.sub(r"\s+", " ", low).strip(), fmt)
+                return True, f"ok (normalized {fmt})"
+            except ValueError:
+                continue
+        return False, f"date unparseable: {value!r}"
+    if ftype == "boolean":
+        return (True, "ok") if isinstance(value, bool) else (False, "boolean must be true/false")
+    if ftype == "enum":
+        allowed = field.get("allowed", [])
+        return (True, "ok") if value in allowed else (False, f"enum {value!r} not in {allowed}")
+    if ftype in ("ocr_paragraph", "summary"):
+        if not isinstance(value, str) or not value.strip():
+            return False, f"{ftype} must be non-empty string"
+        if "max_len" in field and len(value) > field["max_len"]:
+            return False, f"{ftype} exceeds max_len {field['max_len']}"
+        return True, "ok"
+    return False, f"unknown Class A type: {ftype}"
+
+
+def validate_class_b(field: Dict[str, Any], value: Any, source_text: str) -> Tuple[bool, str]:
+    """Verbatim fidelity. Amounts/IDs exact; short nouns exact; long text fuzzy 0.85."""
+    ftype = field["type"]
+    if not isinstance(value, str) or not value.strip():
+        return False, f"{ftype} must be non-empty string"
+    if ftype in ("amount", "account_id", "alphanumeric_id"):
+        norm_val = normalize_amount(value)
+        # exact match required somewhere in source (punctuation-insensitive)
+        norm_src = normalize_amount(source_text)
+        if norm_val and norm_val in norm_src:
+            return True, "ok"
+        return False, f"{ftype} no exact normalized match -> REJECT:EXACT_MISMATCH"
+    # proper nouns / verbatim: length-aware threshold
+    vt, st = _tokens(value), _tokens(source_text)
+    if len(vt) <= 4:
+        ratio = sliding_overlap(vt, st)
+        if ratio >= 1.0:
+            return True, "ok"
+        return False, f"short noun overlap {ratio:.2f} < 1.0 -> REJECT:EXACT_MISMATCH"
+    ratio = sliding_overlap(vt, st)
+    if ratio >= 0.85:
+        return True, "ok"
+    return False, f"long verbatim overlap {ratio:.2f} < 0.85 -> REJECT:FUZZY_MISMATCH"
+
+
+def detect_layer_slip(value: str, source_text: str) -> Tuple[bool, str]:
+    """Duplicate-token slip: cheap-scanner layers ghost-duplicate words with
+    sub-pixel offsets. If the value's occurrence sits adjacent to an identical
+    token (case-insensitive, len>=3), the layer is slipping — fail-closed.
+    Genuine prose doubles ("had had") are rare; documented residual.
+    """
+    vt = _tokens(value)
+    if not vt:
+        return False, "ok"
+    toks = re.findall(r"[A-Za-z0-9]+", source_text)
+    low = [t.lower() for t in toks]
+    n = len(vt)
+    for i in range(len(low) - n + 1):
+        if low[i:i + n] != [t.lower() for t in vt]:
+            continue
+        if i > 0 and len(low[i - 1]) >= 3 and low[i - 1] == low[i]:
+            return True, f"{REJECT_TRUNCATION}: layer slip at {low[i]!r}"
+        j = i + n
+        if j < len(low) and len(low[j]) >= 3 and low[j] == low[j - 1]:
+            return True, f"{REJECT_TRUNCATION}: layer slip at {low[j]!r}"
+    return False, "ok"
+
+
+def _locate_run(value: str, words: List[Dict[str, Any]]) -> Optional[Tuple[float, float, float, float]]:
+    """Union bbox of the value's token run. Matches at token level across the
+    word stream, so single-word multi-token values ('$1,234.56' -> 1 word, 3
+    tokens) locate as well as multi-word runs."""
+    vt = _tokens(value)
+    if not vt or not words:
+        return None
+    stream: List[Tuple[str, int]] = []
+    for wi, w in enumerate(words):
+        for t in _tokens(w["text"]):
+            stream.append((t, wi))
+    n = len(vt)
+    for i in range(len(stream) - n + 1):
+        if [t for t, _ in stream[i:i + n]] == vt:
+            idx = sorted({wi for _, wi in stream[i:i + n]})
+            run = [words[j] for j in idx]
+            return (min(w["x0"] for w in run), min(w["y0"] for w in run),
+                    max(w["x1"] for w in run), max(w["y1"] for w in run))
+    return None
+
+
+def _psm_for(ftype: str, bbox: Optional[Tuple[float, float, float, float]],
+             words: List[Dict[str, Any]]) -> int:
+    """Adaptive PSM: single-token types -> 8; multi-line spans -> 6; else 7."""
+    if ftype in ("amount", "account_id", "alphanumeric_id"):
+        return 8
+    if bbox is not None:
+        lines = {w.get("line") for w in words
+                 if not (w["x1"] <= bbox[0] or w["x0"] >= bbox[2])
+                 and not (w["y1"] <= bbox[1] or w["y0"] >= bbox[3])}
+        if len(lines) > 1:
+            return 6
+    return 7
+
+
+def _locate_best_window(value: str, words: List[Dict[str, Any]]
+                        ) -> Optional[Tuple[float, float, float, float]]:
+    """Union bbox of the best-overlap sliding window (for fuzzy-accepted values
+    with no exact run). Never returns None when words exist."""
+    vt = _tokens(value)
+    n = len(vt)
+    if not n or not words:
+        return None
+    if len(words) <= n:
+        run = words
+    else:
+        best_i, best_hit = 0, -1
+        vset = set(vt)
+        for i in range(len(words) - n + 1):
+            hit = sum(1 for w in words[i:i + n] if w["text"].lower() in vset)
+            if hit > best_hit:
+                best_hit, best_i = hit, i
+        run = words[best_i:best_i + n]
+    return (min(w["x0"] for w in run), min(w["y0"] for w in run),
+            max(w["x1"] for w in run), max(w["y1"] for w in run))
+
+
+def _line_reach(words: List[Dict[str, Any]],
+                run_bbox: Tuple[float, float, float, float]) -> float:
+    """Bounded search radius: median same-band word gap, clamped to [0.5, 1.0]x height."""
+    x0, y0, x1, y1 = run_bbox
+    lh = max(1.0, y1 - y0)
+    band = sorted([w for w in words
+                   if abs((w["y1"] + w["y0"]) / 2 - (y1 + y0) / 2) < 0.5 * lh],
+                  key=lambda w: w["x0"])
+    gaps = [b["x0"] - a["x1"] for a, b in zip(band, band[1:]) if b["x0"] > a["x1"]]
+    med = sorted(gaps)[len(gaps) // 2] if gaps else 0.5 * lh
+    return max(0.5 * lh, min(med * 2.0, 1.0 * lh))
+
+
+def _expand_to_line(bbox: Tuple[float, float, float, float],
+                    words: List[Dict[str, Any]]) -> Tuple[float, float, float, float]:
+    """Anti-tautology expansion: the OCR clip must include what the model may
+    have dropped. Extends the run bbox to full line extents of co-linear words
+    (same block+line as the run's vertical band), so clipped pixels contain
+    any adjacent qualifier glyphs the extraction omitted."""
+    x0, y0, x1, y1 = bbox
+    lh = max(1.0, y1 - y0)
+    line = [w for w in words if abs((w["y1"] + w["y0"]) / 2 - (y1 + y0) / 2) < 0.5 * lh]
+    if line:
+        x0 = min(x0, min(w["x0"] for w in line))
+        x1 = max(x1, max(w["x1"] for w in line))
+        y0 = min(y0, min(w["y0"] for w in line))
+        y1 = max(y1, max(w["y1"] for w in line))
+    return (x0, y0, x1, y1)
+
+
+def validate_field(field: Dict[str, Any], value: Any, source_text: str = "",
+                 spans: Optional[List[Dict[str, Any]]] = None,
+                 fonts: Optional[Dict[Any, Dict[str, Any]]] = None,
+                 words: Optional[List[Dict[str, Any]]] = None,
+                 strict_meta: bool = False,
+                 ocr_fn: Optional[Callable[[Tuple[float, float, float, float]],
+                                           Tuple[str, List[Dict[str, Any]]]]] = None,
+                 ink_fn: Optional[Callable[[Tuple[float, float, float, float], float], bool]] = None,
+                 void_fn: Optional[Callable[[Tuple[float, float, float, float]],
+                                            Tuple[bool, Dict[str, Any]]]] = None
+                 ) -> Tuple[bool, str]:
+    """Dispatch by registry. Class B order: quarantine -> match -> localize ->
+    field tripwire -> (clean: boundary | tainted: ink-probe + OCR re-verdict).
+
+    ocr_fn(bbox) -> (ocr_text, ocr_words) is the isotope tracer (pdf_meta.
+    ocr_field in production, stub in tests). ink_fn(run_bbox, reach_pt) -> bool
+    is the pixel continuation probe (pdf_meta.continuation_ink): ink past the
+    run's right edge means the pixels hold more than the extraction, and no
+    OCR clip derived from the run can be trusted to refute it. No ocr_fn +
+    tainted field = REJECT:OCR_UNAVAILABLE. ok=False is always fail-closed.
+    """
+    ftype = field.get("type", "")
+    if ftype in CLASS_A_TYPES:
+        return validate_class_a(field, value)
+    if ftype in CLASS_B_TYPES:
+        if not isinstance(value, str):
+            return False, f"{ftype} must be string"
+        ok, reason = quarantine_value(value)
+        if not ok:
+            return False, reason
+        slipped, why = detect_layer_slip(value, source_text)
+        if slipped:
+            return False, why
+        meta = (spans is not None and fonts is not None and words is not None)
+        if strict_meta and not meta:
+            return False, REJECT_METADATA_MISSING
+        if not meta:
+            # no metadata: string match only, no pixel or boundary verdicts
+            return validate_class_b(field, value, source_text)
+        exact_run = _locate_run(value, words)
+        bbox = exact_run or _locate_best_window(value, words)
+        # QUARANTINE_VALID tri-state: page-hull integrity rides on every pass
+        # verdict as a suffix tag. COMPROMISED hulls still pass true values
+        # (no starvation) but commit downstream under lock, never as clean.
+        hull = hull_status(source_text, fonts)
+        tag = "" if hull == "CLEAN" else " [hull:COMPROMISED]"
+        # Void localizes ONLY on exact runs: best-window bboxes span margins
+        # and fire on blank paper (measured false TAMPERING at 0.69+ void_frac).
+        if void_fn is not None and exact_run is not None:
+            # Whiteout inversion runs before every other pixel verdict: a
+            # synthetic void makes OCR and ink ratios meaningless. Probe
+            # errors are no-evidence (other gates still apply), a positive is
+            # fail-closed — absence of noise is the signal.
+            try:
+                is_void, det = void_fn(bbox)
+                if is_void:
+                    return False, f"{REJECT_DOCUMENT_TAMPERING}: {det}"
+            except Exception:
+                pass
+        verdict, _why = field_span_verdict(bbox, spans, fonts)
+        if verdict == "fallback":
+            return _ocr_path(field, value, words, bbox, ocr_fn, ink_fn, hull=tag)
+        # clean spans: trust the layer for matching, then verify
+        bounded = ftype in ("proper_noun", "verbatim", "account_id", "alphanumeric_id")
+        ok, reason = validate_class_b(field, value, source_text)
+        if ok:
+            if bounded:
+                ok3, rs3 = check_spatial_boundary(value, words)
+                return (True, "ok" + tag) if ok3 else (False, rs3)
+            return True, "ok" + tag  # amounts: exact match + clean spans suffice
+        # clean layer but mismatch: focal raster fallback decides — a poisoned
+        # layer must never cast the deciding vote against a true extraction.
+        if ocr_fn is None:
+            return False, reason
+        focal = _expand_to_line(bbox, words) if bbox else None
+        if focal is None:
+            return False, reason
+        matched, _, ocr_text, ocr_words = _ocr_with_retry(ocr_fn, focal, field, value, words)
+        if not matched:
+            # Retry already exhausted inside; the layer stands accused by pixels too.
+            ok2, reason2 = validate_class_b(field, value, ocr_text) if ocr_text else (False, reason)
+            return False, reason + f" + focal OCR confirms: {reason2}"
+        ok2, reason2 = quarantine_value(ocr_text)
+        if not ok2:
+            return False, reason2
+        ok2, reason2 = validate_class_b(field, value, ocr_text)
+        if not ok2:
+            return False, reason + f" + focal OCR confirms: {reason2}"
+        if bounded:
+            ok2, reason2 = check_spatial_boundary(value, ocr_words)
+            if not ok2:
+                return False, reason2 + " [focal OCR]"
+        return True, "ok [focal OCR, layer-degraded]" + tag
+    return False, f"unregistered field type: {ftype} -> {REJECT_METADATA_MISSING}"
+
+
+def _ocr_with_retry(ocr_fn: Optional[Callable], clip: Tuple[float, float, float, float],
+                    field: Dict[str, Any], value: str, words: List[Dict[str, Any]]
+                    ) -> Tuple[bool, str, str, List[Dict[str, Any]]]:
+    """OCR once; on mismatch retry once at 450dpi before failing. Returns
+    (matched, reason, ocr_text, ocr_words). A sensor deserves a second look
+    at higher resolution before its disagreement becomes a verdict."""
+    if ocr_fn is None:
+        return False, REJECT_OCR_UNAVAILABLE, "", []
+    base_psm = _psm_for(field.get("type", ""), clip, words)
+    try:
+        text, owords = ocr_fn(clip, psm=base_psm)
+    except Exception as e:
+        return False, f"{REJECT_OCR_UNAVAILABLE}: {e}", "", []
+    ok, reason = validate_class_b(field, value, text)
+    if ok:
+        return True, reason, text, owords
+    try:
+        text2, owords2 = ocr_fn(clip, psm=base_psm, dpi=450)
+    except Exception:
+        return False, reason, text, owords
+    ok2, reason2 = validate_class_b(field, value, text2)
+    if ok2:
+        return True, reason2 + " [retry450]", text2, owords2
+    return False, reason, text, owords
+
+
+def _ocr_path(field: Dict[str, Any], value: str, words: List[Dict[str, Any]],
+              bbox: Optional[Tuple[float, float, float, float]],
+              ocr_fn: Optional[Callable[[Tuple[float, float, float, float]],
+                                        Tuple[str, List[Dict[str, Any]]]]],
+              ink_fn: Optional[Callable[[Tuple[float, float, float, float], float], bool]],
+              hull: str = ""
+              ) -> Tuple[bool, str]:
+    """Tainted-field pixel path: ink probe first, then OCR re-verdict."""
+    ftype = field["type"]
+    bounded = ftype in ("proper_noun", "verbatim", "account_id", "alphanumeric_id")
+    run = _locate_run(value, words)
+    if ink_fn is not None and run is not None:
+        try:
+            if ink_fn(run, _line_reach(words, run)):
+                return False, f"{REJECT_TRUNCATION}: pixel continuation past run"
+        except Exception:
+            pass
+    if ocr_fn is None:
+        return False, REJECT_OCR_UNAVAILABLE
+    clip = _expand_to_line(bbox, words) if bbox else (0, 0, 0, 0)
+    matched, reason, ocr_text, ocr_words = _ocr_with_retry(ocr_fn, clip, field, value, words)
+    if not matched:
+        return False, reason + " [via OCR]"
+    ok, reason = quarantine_value(ocr_text)
+    if not ok:
+        return False, reason
+    ok, reason = validate_class_b(field, value, ocr_text)
+    if not ok:
+        return False, reason + " [via OCR]"
+    if bounded:
+        ok, reason = check_spatial_boundary(value, ocr_words)
+        return (ok, reason + " [via OCR]") if not ok else (True, "ok [via OCR]" + hull)
+    return True, "ok [via OCR]" + hull

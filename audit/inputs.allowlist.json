@@ -1,0 +1,21 @@
+{
+  "$schema": "audit/inputs.allowlist.schema",
+  "description": "Explicit Audit input set. Only these paths may enter Audit runs. Everything else is Draft.",
+  "protocol_version": "v7.6",
+  "allowed_inputs": [
+    "Scoping_Review_Protocol_v7.6.md",
+    "Scoping_Review_Operations_Manual_v1.6.md",
+    "Supplement_S1_Search_Strategies_v1.2.md",
+    "scoping_review_benchmark_extraction_TABLE_FULL.md"
+  ],
+  "denied_by_default": [
+    "drafts/**",
+    "archive_superseded_20260903/**",
+    "reports/**",
+    ".env",
+    ".env.*",
+    "**/*.key",
+    "**/*.pem"
+  ],
+  "notes": "OSF DOI gate intact. No literature searches authorized by this allowlist. Retrieval spans logged separately as span hashes in manifest."
+}

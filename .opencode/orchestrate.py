@@ -85,7 +85,7 @@ def run_pipeline_thread(run_id, payload):
         doc_id = None
         callback_url = payload.get("callback_url")
         output_format = payload.get("format", "web")
-        model = payload.get("model", "oc/hy3-free")
+        model = payload.get("model", "oc/gemini-combo")
         max_parallel = payload.get("max_parallel", 3)
 
         # Step 1: Init
@@ -357,9 +357,9 @@ def resume_pipeline_from_step(run_id, payload, from_step):
             emit_event(run_id, "jobs_done", {"count": job_result.get("jobs_created", 0), "resumed": True})
 
         if start_idx <= 3:  # Need to re-dispatch
-            emit_event(run_id, "dispatch_start", {"model": payload.get("model", "oc/hy3-free"), "resumed": True})
+            emit_event(run_id, "dispatch_start", {"model": payload.get("model", "oc/gemini-combo"), "resumed": True})
             update_pipeline_step(run_id, "dispatching", status="dispatching")
-            dispatch_result = dispatch(doc_id, payload.get("max_parallel", 3), payload.get("model", "oc/hy3-free"))
+            dispatch_result = dispatch(doc_id, payload.get("max_parallel", 3), payload.get("model", "oc/gemini-combo"))
             emit_event(run_id, "dispatch_done", {
                 "passed": dispatch_result.get("passed", 0),
                 "failed": dispatch_result.get("failed", 0),
@@ -1229,8 +1229,8 @@ def main():
     # Step 4: Resume stranded runs
     resume_stranded_runs()
 
-    server = ThreadedHTTPServer(("0.0.0.0", port), OrchestrateHandler)
-    print("Unified Intelligence Engine running at http://0.0.0.0:{}".format(port), flush=True)
+    server = ThreadedHTTPServer(("127.0.0.1", port), OrchestrateHandler)
+    print("Unified Intelligence Engine running at http://127.0.0.1:{}".format(port), flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

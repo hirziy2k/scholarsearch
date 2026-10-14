@@ -21,7 +21,9 @@
       ".ssh/**": "deny",
       ".gnupg/**": "deny",
       "**/.env": "deny",
-      "**/.env.*": "deny"
+      "**/.env.*": "deny",
+      "**/*.env": "deny",
+      "**/redis.env": "deny"
     },
     "edit": {
       "opencode.json": "deny"
@@ -30,11 +32,11 @@
   "mcp": {
     "pdf-tools": {
       "type": "local",
-      "command": ["uvx", "mcp-pdf"]
+      "command": ["uvx", "mcp-pdf==2.3.0"]
     },
     "powerpoint": {
       "type": "local",
-      "command": ["uvx", "--with", "mcp<2", "powerpoint-mcp"]
+      "command": ["uvx", "--with", "mcp<2", "powerpoint-mcp==0.0.27"]
     },
     "scholarsearch-sources": {
       "type": "local",

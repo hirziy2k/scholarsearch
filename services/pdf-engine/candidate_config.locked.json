@@ -1,0 +1,25 @@
+{
+  "matrix": "Operational-Reality-V1",
+  "cost_model": {"cost_false_accept": 100.0, "cost_false_reject": 1.0},
+  "config": {
+    "ink_ratio_floor": 0.005,
+    "ssim_floor": 0.95,
+    "tpr": 0.1862,
+    "fpr": 0.2232,
+    "delta": 0.2157,
+    "cost": 87055.0,
+    "j": -0.037,
+    "cost_fa": 100.0,
+    "cost_fr": 1.0
+  },
+  "evidence": {
+    "n_records": 5337,
+    "n_labeled": 5337,
+    "n_anomaly": 1058,
+    "n_legit": 4279,
+    "strict_reject_rate": 0.8312,
+    "shadow_reject_rate": 0.831,
+    "corpus": "656 unique production docs + 100 programmatic mutants, SHA-256 sealed",
+    "note": "Floors sit at the deny corner: tunable gates explain a minority of verdicts; param-independent gates dominate. Fail-closed by construction."
+  }
+}

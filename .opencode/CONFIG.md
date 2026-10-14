@@ -13,13 +13,16 @@ Default Project/
     ├── package.json                 # OpenCode plugin dependencies
     ├── session-state.json           # Session State Tracker ledger (~120 tokens)
     ├── rules/
-    │   └── context-discipline.md    # 10 immutable governor rules
+    │   ├── context-discipline.md    # 10 immutable governor rules
+    │   └── writing-intake-gate.md   # writing pipeline routing gate
     ├── skills/
     │   ├── session-state-tracker/   # State tracker skill + CLI tools
     │   ├── unified-engine-architecture/
     │   ├── day2-operations/
     │   ├── pdf2pptx-architecture/
-    │   └── scholarsearch-architecture/
+    │   ├── scholarsearch-architecture/
+    │   ├── sciwrite/                # manuscript writing review (QA)
+    │   └── scientific-writing/      # K-Dense drafting scaffolding
     ├── engine/
     │   └── model-aliases.json       # OmniRoute model routing (engine-only, not OpenCode)
     ├── orchestrate.py               # Unified Intelligence Engine (port 8083, legacy primary)
@@ -41,6 +44,7 @@ opencode.json ────────────────► instructions: 
        │                                    │
        │                                    ▼
        │                        context-discipline.md (10 rules)
+       │                        writing-intake-gate.md (routing gate)
        │
        ├──► mcp: { pdf-tools, powerpoint, scholarsearch-sources }
        │
@@ -101,6 +105,6 @@ package.json (root)
 
 1. OpenCode reads `opencode.json`
 2. Sees `instructions: [".opencode/rules/*.md"]`
-3. Loads `.opencode/rules/context-discipline.md`
+3. Loads `.opencode/rules/context-discipline.md` + `writing-intake-gate.md`
 4. Agent receives rules as system instructions
-5. Agent must follow Rules 1-10 at all times
+5. Agent must follow Rules 1-10 at all times + writing intake-gate routing
