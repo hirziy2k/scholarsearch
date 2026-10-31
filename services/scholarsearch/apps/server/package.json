@@ -19,7 +19,7 @@
     "@scholarsearch/omniroute": "*",
     "fastify": "^4.28.0",
     "@fastify/cors": "^9.0.0",
-    "zod": "^3.23.0",
+    "zod": "^4.6.6",
     "uuid": "^9.0.0",
     "@prisma/client": "^5.15.0"
   },
